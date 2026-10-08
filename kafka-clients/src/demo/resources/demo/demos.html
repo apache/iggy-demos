@@ -1,0 +1,207 @@
+<!doctype html>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iggy Demos</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --border: #e2e1dc;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #7a7974;
+    --accent: #2a78d6;
+    --running: #1baf7a;
+    --critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-0: #121211;
+      --surface-1: #1a1a19;
+      --border: #2e2e2c;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #8e8d86;
+      --accent: #3987e5;
+      --running: #199e70;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2e2e2c;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8e8d86;
+    --accent: #3987e5;
+    --running: #199e70;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header { background: var(--surface-1); border-bottom: 1px solid var(--border); }
+  .bar { max-width: 1100px; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; gap: 4px 20px; flex-wrap: wrap; }
+  .name { font-weight: 600; padding: 12px 0; }
+  [role="tablist"] { display: flex; gap: 2px; overflow-x: auto; }
+  [role="tab"] {
+    padding: 12px 14px 10px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--text-secondary);
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  [role="tab"]:hover { color: var(--text-primary); }
+  [role="tab"][aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: 600; }
+  [role="tab"] .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-left: 7px;
+    vertical-align: middle; background: var(--running); visibility: hidden; }
+  [role="tab"].running .dot { visibility: visible; }
+  #shared { max-width: 1100px; margin: 0 auto; padding: 0 16px 10px; color: var(--text-secondary); font-size: 13px; }
+  #shared::before { content: "⚠ "; color: var(--critical); }
+  .panels { flex: 1; position: relative; }
+  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--surface-0); }
+  .offline { max-width: 1100px; margin: 0 auto; padding: 32px 16px; color: var(--text-secondary); }
+  .offline h2 { font-size: 16px; color: var(--text-primary); margin: 0 0 6px; }
+  code { background: var(--surface-1); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <span class="name">Iggy demos</span>
+    <div role="tablist" aria-label="Demos">
+      <button role="tab" id="tab-java" aria-controls="panel-java" data-demo="java">Iggy Java SDK<span class="dot" title="Running"></span></button>
+      <button role="tab" id="tab-rust" aria-controls="panel-rust" data-demo="rust">Iggy Rust SDK<span class="dot" title="Running"></span></button>
+      <button role="tab" id="tab-kafka" aria-controls="panel-kafka" data-demo="kafka">Kafka clients<span class="dot" title="Running"></span></button>
+      <button role="tab" id="tab-cluster" aria-controls="panel-cluster" data-demo="cluster">Iggy cluster<span class="dot" title="Up"></span></button>
+    </div>
+  </div>
+  <p id="shared" hidden>More than one demo is running. They share the Iggy server, so each one's numbers include the others' load.</p>
+</header>
+<div class="panels">
+  <div role="tabpanel" id="panel-java" aria-labelledby="tab-java"><iframe title="Iggy Java SDK demo" src="java/"></iframe></div>
+  <div role="tabpanel" id="panel-rust" aria-labelledby="tab-rust" hidden>
+    <div class="offline" id="rust-offline">
+      <h2>The Iggy Rust SDK demo is not running</h2>
+      <p>It runs as a separate process. Start it from the repository root with <code>cd rust-demo &amp;&amp; cargo run --release</code>. This tab looks for it at <code id="rust-url"></code> and opens it once it answers.</p>
+    </div>
+  </div>
+  <div role="tabpanel" id="panel-kafka" aria-labelledby="tab-kafka" hidden><iframe title="Kafka clients demo" src="kafka/"></iframe></div>
+  <div role="tabpanel" id="panel-cluster" aria-labelledby="tab-cluster" hidden><iframe title="Iggy cluster" src="cluster/"></iframe></div>
+</div>
+<script>
+const RUST_URL = "{{RUST_URL}}";
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+const running = {};
+
+/** Shows one demo. The others stay loaded, so their runs and charts carry on while hidden. */
+function select(demo, focus) {
+  for (const tab of tabs) {
+    const on = tab.dataset.demo === demo;
+    tab.setAttribute("aria-selected", on);
+    tab.tabIndex = on ? 0 : -1;
+    document.getElementById(tab.getAttribute("aria-controls")).hidden = !on;
+    if (on && focus) tab.focus();
+  }
+  history.replaceState(null, "", "#" + demo);
+}
+
+tabs.forEach((tab, i) => {
+  tab.addEventListener("click", () => select(tab.dataset.demo));
+  tab.addEventListener("keydown", e => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (step) select(tabs[(i + step + tabs.length) % tabs.length].dataset.demo, true);
+  });
+});
+
+const STOP_URLS = { kafka: "kafka/stop", java: "java/stop", rust: RUST_URL + "stop" };
+
+function showRunning(demo, on) {
+  running[demo] = on;
+  document.getElementById("tab-" + demo).classList.toggle("running", on);
+  document.getElementById("shared").hidden = Object.values(running).filter(Boolean).length < 2;
+}
+
+/**
+ * Only one demo runs at a time. Before a demo starts it asks here, and the others are stopped
+ * first. The Rust demo is on another port, so its stop is sent without reading the reply.
+ */
+async function stopAllBut(demo) {
+  await Promise.all(Object.keys(STOP_URLS).filter(d => d !== demo).map(async d => {
+    try {
+      await fetch(STOP_URLS[d], d === "rust" ? { method: "POST", mode: "no-cors" } : { method: "POST" });
+      showRunning(d, false);
+    } catch {
+      // Not reachable, so not running.
+    }
+  }));
+}
+
+window.addEventListener("message", async e => {
+  const frame = [...document.querySelectorAll("iframe")].find(f => f.contentWindow === e.source);
+  if (!frame || !e.data) return;
+  const demo = frame.parentElement.id.replace("panel-", "");
+  if (typeof e.data.demoStarting === "string") {
+    await stopAllBut(demo);
+    e.source.postMessage({ demoOthersStopped: e.data.demoStarting }, "*");
+  } else if (typeof e.data.demoRunning === "boolean") {
+    // Each demo page posts whether a run is going, once a second.
+    showRunning(demo, e.data.demoRunning);
+  } else if (typeof e.data.clusterRunning === "boolean") {
+    // The cluster is a server the demos run against, not a demo, so its dot is not a run.
+    document.getElementById("tab-cluster").classList.toggle("running", e.data.clusterRunning);
+  }
+});
+
+// The Rust demo is another process, so its tab waits until it answers.
+document.getElementById("rust-url").textContent = RUST_URL;
+async function findRust() {
+  try {
+    await fetch(RUST_URL, { mode: "no-cors", cache: "no-store" });
+    const frame = document.createElement("iframe");
+    frame.title = "Iggy Rust SDK demo";
+    frame.src = RUST_URL;
+    document.getElementById("rust-offline").replaceWith(frame);
+  } catch {
+    setTimeout(findRust, 3000);
+  }
+}
+findRust();
+
+const initial = location.hash.slice(1);
+select(tabs.some(t => t.dataset.demo === initial) ? initial : tabs[0].dataset.demo);
+</script>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.apache.iggy</groupId>
+  <artifactId>iggy-kafka-clients</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <name>Iggy Kafka clients</name>
+  <description>Kafka Producer, Consumer and Admin API implemented on top of Apache Iggy</description>
+
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <kafka.version>4.3.0</kafka.version>
+    <iggy.version>0.9.0</iggy.version>
+    <!-- The demo to run: DemoServer (this library's Kafka clients) or IggySdkDemoServer (the Iggy SDK directly) -->
+    <demo.main>org.apache.iggy.kafka.demo.DemoLauncher</demo.main>
+    <!-- The benchmark needs Docker images for Iggy and Kafka and takes minutes; see the benchmark profile. -->
+    <surefire.excludedGroups>benchmark</surefire.excludedGroups>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+      <version>${kafka.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.iggy</groupId>
+      <artifactId>iggy</artifactId>
+      <version>${iggy.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.13.4</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+      <version>2.0.5</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-kafka</artifactId>
+      <version>2.0.5</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>2.0.17</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <profiles>
+    <!-- Runs the live demo page against Iggy: mvn -Pdemo compile exec:java, then open http://localhost:8080 -->
+    <profile>
+      <id>demo</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>3.6.1</version>
+            <executions>
+              <execution>
+                <id>demo-sources</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>add-source</goal>
+                </goals>
+                <configuration>
+                  <sources>
+                    <source>src/demo/java</source>
+                  </sources>
+                </configuration>
+              </execution>
+              <execution>
+                <id>demo-resources</id>
+                <phase>generate-resources</phase>
+                <goals>
+                  <goal>add-resource</goal>
+                </goals>
+                <configuration>
+                  <resources>
+                    <resource>
+                      <directory>src/demo/resources</directory>
+                    </resource>
+                  </resources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <version>3.5.1</version>
+            <configuration>
+              <mainClass>${demo.main}</mainClass>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+      <dependencies>
+        <dependency>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-nop</artifactId>
+          <version>2.0.17</version>
+        </dependency>
+      </dependencies>
+    </profile>
+    <!-- Runs only the Iggy-versus-Kafka benchmark: mvn test -Pbenchmark -->
+    <profile>
+      <id>benchmark</id>
+      <properties>
+        <surefire.excludedGroups />
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <groups>benchmark</groups>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <!-- Runs the tests with a kafka-clients 3.x jar in place of the one compiled against:
+         mvn test -Pkafka3 -->
+    <profile>
+      <id>kafka3</id>
+      <properties>
+        <kafka3.version>3.9.1</kafka3.version>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <version>3.8.1</version>
+            <executions>
+              <execution>
+                <id>fetch-kafka3</id>
+                <phase>generate-test-resources</phase>
+                <goals>
+                  <goal>copy</goal>
+                </goals>
+                <configuration>
+                  <artifactItems>
+                    <artifactItem>
+                      <groupId>org.apache.kafka</groupId>
+                      <artifactId>kafka-clients</artifactId>
+                      <version>${kafka3.version}</version>
+                    </artifactItem>
+                  </artifactItems>
+                  <outputDirectory>${project.build.directory}/kafka3</outputDirectory>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <classpathDependencyExcludes>
+                <classpathDependencyExclude>org.apache.kafka:kafka-clients</classpathDependencyExclude>
+              </classpathDependencyExcludes>
+              <additionalClasspathElements>
+                <additionalClasspathElement>${project.build.directory}/kafka3/kafka-clients-${kafka3.version}.jar</additionalClasspathElement>
+              </additionalClasspathElements>
+              <systemPropertyVariables>
+                <expected.kafka.version>${kafka3.version}</expected.kafka.version>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.4</version>
+        <configuration>
+          <excludedGroups>${surefire.excludedGroups}</excludedGroups>
+        </configuration>
+      </plugin>
+      <!-- Java formatting, with the same rules as the Iggy Java SDK: mvn spotless:apply to format, spotless:check to check -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>3.10.3</version>
+        <configuration>
+          <java>
+            <includes>
+              <include>src/main/java/**/*.java</include>
+              <include>src/test/java/**/*.java</include>
+              <include>src/demo/java/**/*.java</include>
+            </includes>
+            <palantirJavaFormat>
+              <version>2.102.0</version>
+            </palantirJavaFormat>
+            <endWithNewline/>
+            <trimTrailingWhitespace/>
+            <importOrder>
+              <order>,javax|java,\#</order>
+            </importOrder>
+            <removeUnusedImports/>
+            <forbidWildcardImports/>
+            <formatAnnotations/>
+          </java>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,610 @@
+<!doctype html>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iggy SDK Demo</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --border: #e2e1dc;
+    --grid: #ecebe7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #7a7974;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-0: #121211;
+      --surface-1: #1a1a19;
+      --border: #2e2e2c;
+      --grid: #262624;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #8e8d86;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2e2e2c;
+    --grid: #262624;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8e8d86;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--text-secondary); margin: 0 0 20px; }
+  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .panel-title { font-size: 14px; margin: 0 0 2px; }
+  .note { color: var(--text-muted); font-size: 12px; margin: 0 0 10px; }
+  .group-title { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: 0 0 8px; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px 24px; }
+  .control-group { display: flex; flex-direction: column; gap: 10px; }
+  label { display: flex; flex-direction: column; gap: 4px; color: var(--text-secondary); font-size: 13px; }
+  label output { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+  label.check { flex-direction: row; align-items: center; gap: 8px; }
+  input[type="range"] { width: 100%; margin: 0; accent-color: var(--series-1); }
+  .hint { color: var(--text-muted); font-size: 12px; }
+  .actions { display: flex; gap: 10px; margin-top: 14px; }
+  button { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-0);
+    color: var(--text-primary); font: inherit; cursor: pointer; }
+  button.primary { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+  #status { color: var(--text-secondary); margin-top: 12px; min-height: 1.4em; }
+  #status.error { color: var(--critical); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .tile .k { color: var(--text-secondary); font-size: 12px; }
+  .tile .v { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .tile .u { color: var(--text-muted); font-size: 12px; font-weight: 400; margin-left: 3px; }
+  .warning { margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--border); border-left: 3px solid var(--critical);
+    border-radius: 6px; background: var(--surface-1); font-size: 13px; }
+  .warning::before { content: "⚠ "; color: var(--critical); }
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 16px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 3px; border-radius: 2px;
+    vertical-align: middle; margin-right: 6px; background: var(--c); }
+  .plot { position: relative; }
+  svg { display: block; width: 100%; height: 220px; overflow: visible; }
+  .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 13px; text-align: center; padding: 0 24px; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 8px; font-size: 12px; white-space: nowrap; display: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12); font-variant-numeric: tabular-nums; }
+  .tip b { font-weight: 600; }
+  .tip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: var(--c); }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 13px; }
+  th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  th:first-child, td:first-child, td.left, th.left { text-align: left; }
+  th { color: var(--text-secondary); font-weight: 500; }
+  .muted { color: var(--text-muted); }
+  .scroll { max-height: 280px; overflow-y: auto; }
+  .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--c); }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--text-secondary); }
+  .meta { color: var(--text-secondary); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+  .meta span { white-space: nowrap; }
+  .meta b { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Iggy SDK demo</h1>
+  <p class="sub">A microservices event bus on the Iggy Java SDK. Each stream is a domain and each topic an event type. Each service is a consumer group with a home stream: it reads a few topics there and a few from other streams. Every number is measured live.</p>
+
+  <section class="panel">
+    <form id="params">
+      <div class="controls">
+        <div class="control-group">
+          <p class="group-title">Producers</p>
+          <label>Message size <output id="o-size"></output>
+            <input id="s-size" type="range" min="0" step="1"><input name="size" type="hidden"></label>
+          <label>Rate per producer <output id="o-rate"></output>
+            <input id="s-rate" type="range" min="0" step="1"><input name="rate" type="hidden"></label>
+          <label>Producers <output id="o-producers"></output>
+            <input id="s-producers" type="range" min="1" max="16" step="1"><input name="producers" type="hidden"></label>
+          <label>Topic skew <output id="o-skew"></output>
+            <input id="s-skew" type="range" min="0" step="1"><input name="skew" type="hidden">
+            <span class="hint">How unevenly messages spread across topics</span></label>
+          <label>Batch wait <output id="o-linger"></output>
+            <input id="s-linger" type="range" min="0" step="1"><input name="linger" type="hidden">
+            <span class="hint">How long a producer waits to fill a batch for a topic; latency includes it</span></label>
+          <label>Batch size <output id="o-batch"></output>
+            <input id="s-batch" type="range" min="0" step="1"><input name="batch" type="hidden">
+            <span class="hint">Most messages in one request, up to 1 MiB</span></label>
+        </div>
+        <div class="control-group">
+          <p class="group-title">Streams and topics</p>
+          <label>Streams <output id="o-streams"></output>
+            <input id="s-streams" type="range" min="0" step="1"><input name="streams" type="hidden">
+            <span class="hint">Removing streams deletes the newest ones, with their topics and data</span></label>
+          <label>Topics per stream <output id="o-topicsPerStream"></output>
+            <input id="s-topicsPerStream" type="range" min="0" step="1"><input name="topicsPerStream" type="hidden">
+            <span class="hint" id="topics-hint">Up to 1,000 topics in all</span></label>
+          <label>Partitions per topic <output id="o-partitions"></output>
+            <input id="s-partitions" type="range" min="1" max="32" step="1"><input name="partitions" type="hidden">
+            <span class="hint" id="partitions-hint">Set when the run starts</span></label>
+        </div>
+        <div class="control-group">
+          <p class="group-title">Services</p>
+          <label>Services <output id="o-services"></output>
+            <input id="s-services" type="range" min="1" max="50" step="1"><input name="services" type="hidden">
+            <span class="hint">Each is a consumer group; service 1 lives in stream 1, service 2 in stream 2, and so on</span></label>
+          <label>Topics per service <output id="o-topicsPerService"></output>
+            <input id="s-topicsPerService" type="range" min="0" step="1"><input name="topicsPerService" type="hidden">
+            <span class="hint">About three quarters from its home stream, the rest from others</span></label>
+          <label>Consumers per service <output id="o-consumers"></output>
+            <input id="s-consumers" type="range" min="1" max="16" step="1"><input name="consumers" type="hidden">
+            <span class="hint">Iggy splits each topic's partitions among a service's consumers</span></label>
+          <label>Poll interval <output id="o-pollInterval"></output>
+            <input id="s-pollInterval" type="range" min="0" step="1"><input name="pollInterval" type="hidden">
+            <span class="hint">How long a consumer waits before polling a topic again after finding nothing new; latency includes it</span></label>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" type="submit">Start</button>
+        <button type="button" id="stop">Stop</button>
+      </div>
+    </form>
+    <div id="status">Not running. Set the sliders and press Start. While it runs, everything except partitions changes straight away.</div>
+  </section>
+
+  <section class="tiles" aria-label="Current values">
+    <div class="tile"><div class="k">Produced</div><div class="v"><span id="t-produced">–</span><span class="u">msg/s</span></div></div>
+    <div class="tile"><div class="k">Consumed, all services</div><div class="v"><span id="t-consumed">–</span><span class="u">msg/s</span></div></div>
+    <div class="tile"><div class="k">Consumed data</div><div class="v"><span id="t-mbps">–</span><span class="u">MB/s</span></div></div>
+    <div class="tile"><div class="k">Latency p50</div><div class="v"><span id="t-p50">–</span><span class="u">ms</span></div></div>
+    <div class="tile"><div class="k">Latency p99</div><div class="v"><span id="t-p99">–</span><span class="u">ms</span></div></div>
+    <div class="tile"><div class="k">Consumer lag</div><div class="v"><span id="t-lag">–</span><span class="u">msgs</span></div></div>
+    <div class="tile"><div class="k">Trimmed before read</div><div class="v"><span id="t-trimmed">–</span><span class="u">msgs</span></div></div>
+    <div class="tile"><div class="k">Errors</div><div class="v"><span id="t-errors">–</span></div></div>
+  </section>
+  <p class="warning" id="trim-warning" hidden></p>
+
+  <section class="panel" style="margin-top:16px">
+    <h2 class="panel-title">Services</h2>
+    <p class="note">Each message is read once by every service that reads its topic, so consumed can be higher than produced. A consumer reads its partitions one at a time, so the more partitions per consumer, the higher the latency.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Service</th><th>Home stream</th><th class="left">Topics</th><th>Consumers</th><th>Avg partitions per consumer</th><th>Consumed/s</th><th>Lag</th><th>p50 ms</th><th>p99 ms</th></tr></thead>
+      <tbody id="service-rows"><tr><td colspan="9" class="muted">Start a run to see the services.</td></tr></tbody>
+    </table></div>
+    <details>
+      <summary>Partitions owned by each consumer</summary>
+      <div id="owners" class="muted" style="margin-top:8px">Start a run to see the assignment.</div>
+    </details>
+  </section>
+
+  <section class="charts">
+    <div class="panel">
+      <h2 class="panel-title">Throughput</h2>
+      <p class="note">Messages per second, last 60 seconds</p>
+      <div class="legend"><span style="--c: var(--series-1)">Produced</span><span style="--c: var(--series-2)">Consumed, all services</span><span style="--c: var(--series-3)">Trimmed before read</span></div>
+      <div class="plot" id="plot-rate"></div>
+    </div>
+    <div class="panel">
+      <h2 class="panel-title">Latency</h2>
+      <p class="note">From when a message is made to when it is read, in milliseconds, last 60 seconds</p>
+      <div class="legend"><span style="--c: var(--series-1)">p50</span><span style="--c: var(--series-2)">p99</span></div>
+      <div class="plot" id="plot-latency"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel-title">Topics</h2>
+    <p class="note">Busiest first. Each send picks a topic at random, weighted by the skew: with Zipf, the second busiest topic gets half the traffic of the first, the third a third, and so on. Which topics are busiest is random. 3.2 is topic 2 in stream 3.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Topic</th><th>Produced/s</th><th class="left">Read by</th></tr></thead>
+      <tbody id="topic-rows"><tr><td colspan="3" class="muted">Start a run to see the topics.</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel">
+    <div class="meta" id="meta">No run yet.</div>
+    <details>
+      <summary>Show the data as a table</summary>
+      <table style="margin-top:8px">
+        <thead><tr><th>Time</th><th>Produced/s</th><th>Consumed/s</th><th>MB/s</th><th>p50 ms</th><th>p99 ms</th><th>Lag</th><th>Trimmed/s</th><th>GC ms</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </details>
+  </section>
+</main>
+
+<script>
+const WINDOW = 60;
+const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
+let history = [];
+let formSynced = false;
+let running = false, pending = null;
+
+const fmt = (v, digits = 0) =>
+  v == null || Number.isNaN(v) ? "–" : v.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+const timeLabel = t => new Date(t).toLocaleTimeString(undefined, { hour12: false });
+
+// ---- sliders ----
+
+const SIZES = [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1000000];
+const RATES = [10, 20, 50, 100, 200, 500, 1000, 2000, 2500, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000, 0];
+const STREAMS = [1, 2, 3, 4, 5, 10, 20, 50, 100, 200, 500, 1000];
+const TOPICS_PER_SERVICE = [1, 2, 3, 4, 5, 6, 8, 10, 20, 50];
+const TOPICS_PER_STREAM = [1, 2, 3, 4, 5, 6, 8, 10, 20, 50, 100];
+const SKEWS = [0, 5, 10, 15, 20];
+const LINGERS = [0, 1, 2, 5, 10, 20, 50, 100];
+const POLL_INTERVALS = [0, 1, 2, 5, 10, 20, 50, 100];
+const pollText = ms => ms === 0 ? "none (1 ms pause when every topic is empty)" : ms + " ms";
+const BATCHES = [1, 10, 100, 500, 1000, 5000, 10000];
+const lingerText = ms => ms === 0 ? "none (send what is due)" : ms + " ms";
+const batchText = n => fmt(n) + (n === 1 ? " message" : " messages");
+const skewText = k => ({ 0: "even", 5: "mild", 10: "Zipf (typical)", 15: "steep", 20: "very steep" })[k] ?? "Zipf " + k / 10;
+const sizeText = b => b >= 1000000 ? "1 MB" : b >= 1024 ? (b / 1024) + " KB" : b + " B";
+const rateText = r => r === 0 ? "unlimited" : fmt(r) + " msg/s";
+const indexOf = (list, v) => {
+  if (v === 0 && list === RATES) return list.length - 1;
+  let best = 0;
+  list.forEach((x, i) => { if (x !== 0 && Math.abs(Math.log(x) - Math.log(v)) < Math.abs(Math.log(list[best]) - Math.log(v))) best = i; });
+  return best;
+};
+const form = document.getElementById("params");
+const listSlider = (list, text) => ({ list, value: i => list[i], text, index: v => indexOf(list, v) });
+const intSlider = () => ({ value: i => +i, text: n => n, index: v => v });
+const sliders = {
+  size: listSlider(SIZES, sizeText),
+  rate: listSlider(RATES, rateText),
+  producers: intSlider(),
+  streams: listSlider(STREAMS, n => n),
+  topicsPerStream: listSlider(TOPICS_PER_STREAM, n => n),
+  partitions: intSlider(),
+  services: intSlider(),
+  topicsPerService: listSlider(TOPICS_PER_SERVICE, n => n),
+  consumers: intSlider(),
+  pollInterval: { list: POLL_INTERVALS, value: i => POLL_INTERVALS[i], text: pollText, index: v => Math.max(0, POLL_INTERVALS.indexOf(v)) },
+  linger: { list: LINGERS, value: i => LINGERS[i], text: lingerText, index: v => Math.max(0, LINGERS.indexOf(v)) },
+  batch: { list: BATCHES, value: i => BATCHES[i], text: batchText, index: v => Math.max(0, BATCHES.indexOf(v)) },
+  skew: { list: SKEWS, value: i => SKEWS[i], text: skewText, index: v => Math.max(0, SKEWS.indexOf(v)) },
+};
+for (const [name, sl] of Object.entries(sliders)) {
+  sl.el = document.getElementById("s-" + name);
+  sl.out = document.getElementById("o-" + name);
+  if (sl.list) sl.el.max = sl.list.length - 1;
+}
+
+function showSlider(name) {
+  const sl = sliders[name], v = sl.value(+sl.el.value);
+  form[name].value = v;
+  sl.out.textContent = sl.text(v);
+}
+function setSliders(s) {
+  for (const name of Object.keys(sliders)) sliders[name].el.value = sliders[name].index(s[name]);
+  Object.keys(sliders).forEach(showSlider);
+  if (typeof topicsOk === "function") topicsOk();
+}
+setSliders({ size: 512, rate: 2500, producers: 1, streams: 5, topicsPerStream: 6, partitions: 4, services: 10, topicsPerService: 4, consumers: 1, pollInterval: 5, skew: 10, linger: 5, batch: 1000 });
+
+function formBody() {
+  return new URLSearchParams(new FormData(form));
+}
+function topicsOk() {
+  const total = form.streams.value * form.topicsPerStream.value;
+  const hint = document.getElementById("topics-hint");
+  hint.textContent = total > 1000 ? `${fmt(total)} topics: the most is 1,000` : `${fmt(total)} topics in all (up to 1,000)`;
+  hint.style.color = total > 1000 ? "var(--critical)" : "";
+  return total <= 1000;
+}
+function scheduleUpdate() {
+  if (!topicsOk()) return;
+  if (!running) return;
+  clearTimeout(pending);
+  // Apply once the control settles, not on every pixel of a drag.
+  pending = setTimeout(async () => {
+    const res = await fetch("update", { method: "POST", body: formBody() });
+    if (!res.ok) say(await res.text(), true);
+  }, 250);
+}
+for (const name of Object.keys(sliders)) {
+  sliders[name].el.addEventListener("input", () => { showSlider(name); topicsOk(); if (name !== "partitions") scheduleUpdate(); });
+}
+
+function setRunning(on) {
+  running = on;
+  // Partitions are fixed for a run; everything else applies live.
+  sliders.partitions.el.disabled = on;
+  document.getElementById("partitions-hint").textContent = on ? "Fixed for this run; Start again to change" : "Set when the run starts";
+}
+
+// ---- charts ----
+
+/** A round step giving at most five intervals up to v. */
+function niceStep(v) {
+  if (!(v > 0)) return 1;
+  const raw = v / 5, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p;
+  return 10 * p;
+}
+
+/** GC pauses in a sample: the JVM reports each stop-the-world collection, in milliseconds. */
+const GC_MARK_MS = 10;
+const gcLongest = p => p.gc && p.gc.length ? Math.max(...p.gc) : 0;
+const gcText = p => "GC " + fmt(gcLongest(p)) + " ms" + (p.gc.length > 1 ? " \u00d7" + p.gc.length : "");
+const gcList = p => p.gc && p.gc.length ? p.gc.map(g => fmt(g)).join(", ") : "";
+
+/** A line chart with change markers, direct labels and a crosshair tooltip. */
+function lineChart(el, series, unit, digits, emptyText) {
+  const W = el.clientWidth || 480, H = 220, L = 56, R = 72, T = 14, B = 26;
+  const pts = history;
+  if (pts.length < 2 || !series.length) {
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}"></svg><div class="empty">${emptyText}</div>`;
+    return;
+  }
+  const values = pts.flatMap(p => series.map(s => s.get(p))).filter(v => v != null);
+  const top = Math.max(0, ...values);
+  const step = niceStep(top);
+  const max = Math.max(step, Math.ceil(top / step) * step);
+  const x = i => L + (W - L - R) * (i / (WINDOW - 1)) + (W - L - R) * ((WINDOW - pts.length) / (WINDOW - 1));
+  const y = v => T + (H - T - B) * (1 - v / max);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${series.map(s => s.name).join(", ")}">`;
+  for (let t = 0; t <= max + step / 2; t += step) {
+    svg += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/>`;
+    svg += `<text x="${L - 8}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="var(--text-muted)">${fmt(t, step < 1 ? 1 : 0)}</text>`;
+  }
+  // The axis always spans the last 60 seconds, so label its left edge, not the first sample.
+  svg += `<text x="${L}" y="${H - 6}" font-size="11" fill="var(--text-muted)">${timeLabel(pts[pts.length - 1].t - (WINDOW - 1) * 1000)}</text>`;
+  svg += `<text x="${W - R}" y="${H - 6}" text-anchor="end" font-size="11" fill="var(--text-muted)">${timeLabel(pts[pts.length - 1].t)}</text>`;
+  // Mark each point where a setting changed, labelled with what it changed to.
+  let lastLabelX = -Infinity;
+  pts.forEach((p, i) => {
+    if (i === 0) return;
+    const changes = describeChanges(pts[i - 1], p);
+    if (!changes.length) return;
+    svg += `<line x1="${x(i)}" x2="${x(i)}" y1="${T}" y2="${H - B}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="2 3"/>`;
+    if (x(i) - lastLabelX > 70) {
+      svg += `<text x="${x(i) + 4}" y="${T - 2}" font-size="10" fill="var(--text-muted)">${changes.join(", ")}</text>`;
+      lastLabelX = x(i);
+    }
+  });
+  // Mark each second with a GC pause of GC_MARK_MS or more, labelled along the bottom.
+  let lastGcX = -Infinity;
+  pts.forEach((p, i) => {
+    if (gcLongest(p) < GC_MARK_MS) return;
+    svg += `<line x1="${x(i)}" x2="${x(i)}" y1="${T}" y2="${H - B}" stroke="var(--critical)" stroke-width="1" stroke-dasharray="4 2"/>`;
+    if (x(i) - lastGcX > 70) {
+      svg += `<text x="${x(i) + 4}" y="${H - B - 4}" font-size="10" fill="var(--critical)">${gcText(p)}</text>`;
+      lastGcX = x(i);
+    }
+  });
+  const ends = [];
+  for (const s of series) {
+    let d = "", pen = false;
+    pts.forEach((p, i) => {
+      const v = s.get(p);
+      if (v == null) { pen = false; return; }
+      d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+      pen = true;
+    });
+    svg += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const v = s.get(pts[i]);
+      if (v == null) continue;
+      svg += `<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="${s.color}" stroke="var(--surface-1)" stroke-width="2"/>`;
+      ends.push({ x: x(i) + 8, y: y(v) + 4, text: s.short });
+      break;
+    }
+  }
+  // Direct labels: push apart any two that would overlap.
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+  // Then pull them back up if the stack runs past the bottom of the plot.
+  for (let i = ends.length - 1, limit = H - B + 4; i >= 0; i--, limit -= 13) ends[i].y = Math.min(ends[i].y, limit);
+  for (const e of ends) svg += `<text x="${e.x}" y="${e.y}" font-size="11" fill="var(--text-secondary)">${e.text}</text>`;
+  svg += `<line class="cross" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>`;
+  svg += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent"/></svg><div class="tip"></div>`;
+  el.innerHTML = svg;
+
+  const svgEl = el.querySelector("svg"), cross = el.querySelector(".cross"), tip = el.querySelector(".tip");
+  el.querySelector("rect").addEventListener("mousemove", e => {
+    const box = svgEl.getBoundingClientRect();
+    const sx = (e.clientX - box.left) * (W / box.width);
+    let best = 0, bestDist = Infinity;
+    pts.forEach((p, i) => { const dist = Math.abs(x(i) - sx); if (dist < bestDist) { bestDist = dist; best = i; } });
+    const p = pts[best];
+    cross.setAttribute("x1", x(best)); cross.setAttribute("x2", x(best)); cross.setAttribute("visibility", "visible");
+    tip.innerHTML = `<div>${timeLabel(p.t)}</div>` + series.map(s =>
+      `<div><i style="--c:${s.color}"></i>${s.name} <b>${fmt(s.get(p), digits)}</b> ${unit}</div>`).join("")
+      + (gcList(p) ? `<div><i style="--c:var(--critical)"></i>GC pauses <b>${gcList(p)}</b> ms</div>` : "");
+    tip.style.display = "block";
+    tip.style.left = Math.min(x(best) * (box.width / W) + 12, box.width - tip.offsetWidth) + "px";
+    tip.style.top = "8px";
+  });
+  el.querySelector("rect").addEventListener("mouseleave", () => { cross.setAttribute("visibility", "hidden"); tip.style.display = "none"; });
+}
+
+function describeChanges(prev, p) {
+  const out = [];
+  const plural = (n, word) => n + " " + word + (n === 1 ? "" : "s");
+  if (p.size !== prev.size) out.push(sizeText(p.size));
+  if (p.rate !== prev.rate) out.push(rateText(p.rate));
+  if (p.producers !== prev.producers) out.push(plural(p.producers, "producer"));
+  if (p.streams !== prev.streams) out.push(plural(p.streams, "stream"));
+  if (p.topicsPerStream !== prev.topicsPerStream) out.push(p.topicsPerStream + " topics per stream");
+  if (p.services !== prev.services) out.push(plural(p.services, "service"));
+  if (p.topicsPerService !== prev.topicsPerService) out.push(p.topicsPerService + " topics per service");
+  if (p.consumers !== prev.consumers) out.push(plural(p.consumers, "consumer") + " each");
+  if (p.pollInterval !== prev.pollInterval) out.push("poll " + (p.pollInterval === 0 ? "none" : p.pollInterval + " ms"));
+  if (p.skew !== prev.skew) out.push("skew " + skewText(p.skew));
+  if (p.linger !== prev.linger) out.push("wait " + (p.linger === 0 ? "none" : p.linger + " ms"));
+  if (p.batch !== prev.batch) out.push("batch " + fmt(p.batch));
+  return out;
+}
+
+function render() {
+  lineChart(document.getElementById("plot-rate"), [
+    { name: "Produced", short: "Produced", color: SERIES[0], get: p => p.produced },
+    { name: "Consumed, all services", short: "Consumed", color: SERIES[1], get: p => p.consumed },
+    { name: "Trimmed before read", short: "Trimmed", color: SERIES[2], get: p => p.trimmedRate },
+  ], "msg/s", 0, "Start a run to see throughput.");
+  lineChart(document.getElementById("plot-latency"), [
+    { name: "p50", short: "p50", color: SERIES[0], get: p => p.p50 },
+    { name: "p99", short: "p99", color: SERIES[1], get: p => p.p99 },
+  ], "ms", 1, "Start a run to see latency.");
+  document.getElementById("rows").innerHTML = [...history].reverse().map(p =>
+    `<tr><td>${timeLabel(p.t)}</td><td>${fmt(p.produced)}</td><td>${fmt(p.consumed)}</td><td>${fmt(p.mbps, 2)}</td><td>${fmt(p.p50, 1)}</td><td>${fmt(p.p99, 1)}</td><td>${fmt(p.lag)}</td><td>${fmt(p.trimmedRate)}</td><td>${gcList(p)}</td></tr>`).join("");
+}
+
+// ---- live updates ----
+
+const status = document.getElementById("status");
+function say(text, isError) { status.textContent = text; status.className = isError ? "error" : ""; }
+const set = (id, v) => document.getElementById(id).textContent = v;
+const esc = t => String(t).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"})[c]);
+
+function update(s) {
+  if (running !== !!s.running) setRunning(!!s.running);
+  // Tells the demos page, when this page is one of its tabs, whether a run is going.
+  if (window.parent !== window) window.parent.postMessage({ demoRunning: !!s.running }, "*");
+  if (!s.running) {
+    ["t-produced", "t-consumed", "t-mbps", "t-p50", "t-p99", "t-lag", "t-trimmed", "t-errors"].forEach(id => set(id, "–"));
+    document.getElementById("trim-warning").hidden = true;
+    if (status.className !== "error" && status.textContent.startsWith("Running")) say("Stopped. The charts keep the last minute of the run.");
+    return;
+  }
+  if (!formSynced) {
+    // After a reload, show the settings of the run in progress, not the defaults.
+    setSliders(s);
+    formSynced = true;
+  }
+  if (status.className !== "error") say(`Running ${s.topic}. Move a control to change it live; Start begins again with new topics.`);
+  if (history.length && history[history.length - 1].topic !== s.topic) history = [];
+  history.push(s);
+  if (history.length > WINDOW) history.shift();
+
+  set("t-produced", fmt(s.produced));
+  set("t-consumed", fmt(s.consumed));
+  set("t-mbps", fmt(s.mbps, 2));
+  set("t-p50", fmt(s.p50, 1));
+  set("t-p99", fmt(s.p99, 1));
+  set("t-lag", fmt(s.lag));
+  set("t-trimmed", fmt(s.trimmed));
+  set("t-errors", fmt(s.errors));
+  const warn = document.getElementById("trim-warning");
+  warn.hidden = !(s.trimmedRate > 0);
+  warn.textContent = `Retention deleted ${fmt(s.trimmedRate)} messages/s before a service read them: a topic passed its ${fmt(s.maxTopicMiB)} MiB cap and Iggy removed its oldest segments, read or not.`;
+
+  const topicList = labels => labels.length > 8 ? `${labels.length} topics` : labels.join(" ");
+  document.getElementById("service-rows").innerHTML = s.serviceStats.map(sv => {
+    const perConsumer = sv.consumers ? sv.topics.length * s.partitions / sv.consumers : null;
+    return `<tr><td>S${sv.number}</td><td>${sv.home}</td><td class="left">${topicList(sv.topics)}</td>`
+      + `<td>${sv.consumers}</td><td>${fmt(perConsumer)}</td><td>${fmt(sv.consumed)}</td><td>${fmt(sv.lag)}</td>`
+      + `<td>${fmt(sv.p50, 1)}</td><td>${fmt(sv.p99, 1)}</td></tr>`;
+  }).join("");
+  document.getElementById("owners").innerHTML = s.serviceStats.map(sv =>
+    `<div><b>S${sv.number}</b>: ` + sv.owners.map((parts, i) => {
+      const topics = new Set(parts.map(o => o.split(":")[0]));
+      return `consumer ${i + 1} has ${parts.length ? `${parts.length} partitions in ${topics.size} topics` : "nothing (idle)"}`;
+    }).join("; ") + "</div>").join("");
+  document.getElementById("topic-rows").innerHTML = [...s.topicStats].sort((a, b) => b.produced - a.produced || a.label.localeCompare(b.label, undefined, { numeric: true })).map(t =>
+    `<tr><td>${t.label}</td><td>${fmt(t.produced)}</td><td class="left">${t.readBy.length ? t.readBy.map(n => "S" + n).join(" ") : '<span class="muted">no service</span>'}</td></tr>`).join("");
+
+  const plural = (n, word) => `<b>${fmt(n)}</b> ${word}${n === 1 ? "" : "s"}`;
+  const items = [
+    `Run <b>${s.topic}</b>`,
+    `<b>${sizeText(s.size)}</b> messages`,
+    `rate <b>${s.rate === 0 ? "unlimited" : fmt(s.rate) + "/s"}</b> per producer`,
+    plural(s.producers, "producer"),
+    plural(s.streams, "stream"),
+    plural(s.topicCount, "topic"),
+    `<b>${s.partitions}</b> partitions each`,
+    `skew <b>${skewText(s.skew)}</b>`,
+    `batch wait <b>${lingerText(s.linger)}</b>, up to <b>${fmt(s.batch)}</b> per request`,
+    plural(s.services, "service"),
+    `<b>${s.topicsPerService}</b> topics and <b>${s.consumers}</b> ${s.consumers === 1 ? "consumer" : "consumers"} per service, poll interval <b>${pollText(s.pollInterval)}</b>`,
+    `each topic capped at <b>${fmt(s.maxTopicMiB)}</b> MiB`,
+    `sent <b>${fmt(s.totalProduced)}</b>`,
+    `read <b>${fmt(s.totalConsumed)}</b>`,
+    `avg send request <b>${fmt(s.sendLatencyAvg, 2)}</b> ms, <b>${fmt(s.batchAvg, 1)}</b> messages per request on average`,
+    `avg fetch request <b>${fmt(s.fetchLatencyAvg, 2)}</b> ms`,
+  ];
+  if (s.lastError) items.push(`last error: ${esc(s.lastError)}`);
+  document.getElementById("meta").innerHTML = items.map(i => `<span>${i}</span>`).join("");
+  render();
+}
+
+/**
+ * On the demos page, asks it to stop the other demos and waits until it has, so only one demo
+ * runs against Iggy at a time. Opened on its own, the page starts straight away.
+ */
+function stopOtherDemos() {
+  if (window.parent === window) return Promise.resolve();
+  const id = Math.random().toString(36).slice(2);
+  return new Promise(resolve => {
+    const done = e => {
+      if (e.data && e.data.demoOthersStopped === id) { window.removeEventListener("message", done); resolve(); }
+    };
+    window.addEventListener("message", done);
+    window.parent.postMessage({ demoStarting: id }, "*");
+    setTimeout(resolve, 15000); // start anyway if the demos page does not answer
+  });
+}
+
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  say("Starting… stopping any other demo");
+  await stopOtherDemos();
+  say("Starting… creating topics");
+  const res = await fetch("start", { method: "POST", body: formBody() });
+  const text = await res.text();
+  if (res.ok) { history = []; formSynced = true; setRunning(true); render(); say("Running " + text.replace("started ", "") + "."); }
+  else say(text, true);
+});
+document.getElementById("stop").addEventListener("click", async () => {
+  await fetch("stop", { method: "POST" });
+  say("Stopped. The charts keep the last minute of the run.");
+});
+
+new EventSource("events").onmessage = e => update(JSON.parse(e.data));
+window.addEventListener("resize", render);
+render();
+</script>
+</body>
+</html>
