@@ -36,6 +36,9 @@ under the License.
     --running: #1baf7a;
     --warning: #eda100;
     --critical: #d03b3b;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
@@ -50,6 +53,9 @@ under the License.
       --accent: #3987e5;
       --running: #199e70;
       --warning: #c98500;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
     }
   }
   :root[data-theme="dark"] {
@@ -64,6 +70,9 @@ under the License.
     --accent: #3987e5;
     --running: #199e70;
     --warning: #c98500;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
   }
   * { box-sizing: border-box; }
   body {
@@ -108,6 +117,35 @@ under the License.
   summary { cursor: pointer; color: var(--text-secondary); font-size: 13px; }
   pre { margin: 8px 0 0; padding: 8px 10px; max-height: 220px; overflow: auto; font-size: 11px; line-height: 1.4;
     background: var(--surface-0); border: 1px solid var(--border); border-radius: 6px; white-space: pre-wrap; word-break: break-all; }
+  .panel-title { font-size: 14px; margin: 0 0 2px; }
+  .note { color: var(--text-muted); font-size: 12px; margin: 0 0 10px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .tile .k { color: var(--text-secondary); font-size: 12px; }
+  .tile .v { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .tile .u { color: var(--text-muted); font-size: 12px; font-weight: 400; margin-left: 3px; }
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .charts .panel { margin-bottom: 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 3px; border-radius: 2px;
+    vertical-align: middle; margin-right: 6px; background: var(--c); }
+  .plot { position: relative; }
+  svg { display: block; width: 100%; height: 220px; overflow: visible; }
+  .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 13px; text-align: center; padding: 0 24px; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 8px; font-size: 12px; white-space: nowrap; display: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12); font-variant-numeric: tabular-nums; }
+  .tip b { font-weight: 600; }
+  .tip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: var(--c); }
+  .node h2 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+  .nodes { margin-bottom: 16px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 13px; }
+  th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  th:first-child, td:first-child, td.left, th.left { text-align: left; }
+  th { color: var(--text-secondary); font-weight: 500; }
+  .muted { color: var(--text-muted); }
+  .scroll { max-height: 280px; overflow-y: auto; }
 </style>
 </head>
 <body>
@@ -130,7 +168,47 @@ under the License.
     </div>
   </section>
 
+  <section class="tiles" aria-label="Current values">
+    <div class="tile"><div class="k">Nodes up</div><div class="v"><span id="t-up">–</span><span class="u">of 3</span></div></div>
+    <div class="tile"><div class="k">Leader</div><div class="v"><span id="t-leader">–</span></div></div>
+    <div class="tile"><div class="k">Messages on the leader</div><div class="v"><span id="t-messages">–</span></div></div>
+    <div class="tile"><div class="k">Writes on the leader</div><div class="v"><span id="t-rate">–</span><span class="u">msg/s</span></div></div>
+    <div class="tile"><div class="k">Catching up</div><div class="v"><span id="t-catching">–</span></div></div>
+    <div class="tile"><div class="k">Clients connected</div><div class="v"><span id="t-clients">–</span></div></div>
+  </section>
+
+  <section class="charts">
+    <div class="panel">
+      <h2 class="panel-title">Messages stored</h2>
+      <p class="note">Messages each node holds, last 60 seconds. A follower's line tracks the leader's; a stopped node's line breaks, and when it starts again it climbs back as it catches up.</p>
+      <div class="legend"><span style="--c: var(--series-1)">Node 1</span><span style="--c: var(--series-2)">Node 2</span><span style="--c: var(--series-3)">Node 3</span></div>
+      <div class="plot" id="plot-messages"></div>
+    </div>
+    <div class="panel">
+      <h2 class="panel-title">Writes</h2>
+      <p class="note">Messages each node stored per second, last 60 seconds. Every node writes each message, so the lines sit on top of each other while all three are up.</p>
+      <div class="legend"><span style="--c: var(--series-1)">Node 1</span><span style="--c: var(--series-2)">Node 2</span><span style="--c: var(--series-3)">Node 3</span></div>
+      <div class="plot" id="plot-rate"></div>
+    </div>
+  </section>
+
   <div class="nodes" id="nodes"></div>
+
+  <section class="panel">
+    <h2 class="panel-title">What happened</h2>
+    <p class="note">Nodes starting and stopping, leader changes and followers catching up, newest first. A restarted node replays the messages it missed, so it writes faster than the leader until it is back in step. Message counts differ a little between nodes because each node's retention deletes old segments on its own schedule.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Time</th><th class="left">Event</th></tr></thead>
+      <tbody id="event-rows"><tr><td colspan="2" class="muted">Nothing yet.</td></tr></tbody>
+    </table></div>
+    <details>
+      <summary>Show the data as a table</summary>
+      <table style="margin-top:8px">
+        <thead><tr><th>Time</th><th>Leader</th><th>Node 1 msgs</th><th>Node 2 msgs</th><th>Node 3 msgs</th><th>Node 1 msg/s</th><th>Node 2 msg/s</th><th>Node 3 msg/s</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </details>
+  </section>
 </main>
 <script>
 const esc = t => String(t).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"})[c]);
@@ -155,12 +233,19 @@ function upText(s) {
 function buildNodes(nodes) {
   nodesEl.innerHTML = nodes.map(n => `
     <section class="node" id="node-${n.id}">
-      <h2>${esc(n.name)} <span class="pill state" id="state-${n.id}"></span><span class="pill role" id="role-${n.id}" hidden></span></h2>
+      <h2><span class="swatch" style="--c: ${SERIES[n.id - 1]}"></span>${esc(n.name)} <span class="pill state" id="state-${n.id}"></span><span class="pill role" id="role-${n.id}" hidden></span></h2>
       <div class="ports">Replica ${n.replicaId} · TCP localhost:${n.tcp} · HTTP localhost:${n.http}</div>
       <div class="facts">
         <span>Container</span><b>${esc(n.container)}</b>
         <span>Up for</span><b id="up-${n.id}">–</b>
         <span>Cluster status</span><b id="status-${n.id}">–</b>
+        <span>Messages</span><b id="messages-${n.id}">–</b>
+        <span>Writes</span><b id="rate-${n.id}">–</b>
+        <span>Message data</span><b id="data-${n.id}">–</b>
+        <span>Streams, topics, partitions</span><b id="shape-${n.id}">–</b>
+        <span>Segments</span><b id="segments-${n.id}">–</b>
+        <span>Clients, consumer groups</span><b id="clients-${n.id}">–</b>
+        <span>CPU, memory</span><b id="cpu-${n.id}">–</b>
       </div>
       <div class="actions">
         <button class="primary" data-start="${n.id}">Start node</button>
@@ -183,6 +268,7 @@ setInterval(() => openLogs.forEach(loadLog), 2000);
 
 function update(s) {
   latest = s;
+  record(s);
   if (!nodesEl.children.length) buildNodes(s.nodes);
   const running = s.nodes.filter(n => n.state === "running").length;
   if (window.parent !== window) window.parent.postMessage({ clusterRunning: running > 0 }, "*");
@@ -209,7 +295,200 @@ function update(s) {
     set("status-" + n.id, n.status || (n.state === "running" ? "not in the cluster's view yet" : "–"));
     card.querySelector("[data-start]").disabled = s.busy || n.state === "running";
     card.querySelector("[data-stop]").disabled = s.busy || n.state !== "running";
+    const st = n.stats, point = history[history.length - 1].nodes[n.id - 1];
+    set("messages-" + n.id, st ? fmt(st.messages) : "–");
+    set("rate-" + n.id, point.rate == null ? "–" : fmt(point.rate) + " msg/s");
+    set("data-" + n.id, st ? bytesText(st.messageBytes) : "–");
+    set("shape-" + n.id, st ? `${fmt(st.streams)}, ${fmt(st.topics)}, ${fmt(st.partitions)}` : "–");
+    set("segments-" + n.id, st ? fmt(st.segments) : "–");
+    set("clients-" + n.id, st ? `${fmt(st.clients)}, ${fmt(st.consumerGroups)}` : "–");
+    set("cpu-" + n.id, st ? `${fmt(st.cpu, 1)}%, ${bytesText(st.memoryBytes)}` : "–");
   }
+
+  const lp = leader && history[history.length - 1].nodes[leader.id - 1];
+  set("t-up", running);
+  set("t-leader", leader ? "Node " + leader.id : "–");
+  set("t-messages", lp && lp.messages != null ? fmt(lp.messages) : "–");
+  set("t-rate", lp && lp.rate != null ? fmt(lp.rate) : "–");
+  set("t-catching", catchingUp.size ? [...catchingUp.keys()].map(id => "Node " + id).join(", ") : running ? "none" : "–");
+  const clients = s.nodes.filter(n => n.stats).map(n => n.stats.clients);
+  set("t-clients", clients.length ? fmt(clients.reduce((a, b) => a + b, 0)) : "–");
+  render();
+}
+
+// ---- history and events ----
+
+const WINDOW = 60;
+const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)"];
+let history = [];
+const events = [];
+/** Nodes started since the page opened and not yet writing in step with the leader, by id. */
+const catchingUp = new Map();
+
+const fmt = (v, digits = 0) =>
+  v == null || Number.isNaN(v) ? "–" : v.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+const timeLabel = t => new Date(t).toLocaleTimeString(undefined, { hour12: false });
+function bytesText(b) {
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let i = 0;
+  while (b >= 1024 && i < units.length - 1) { b /= 1024; i++; }
+  return fmt(b, i === 0 ? 0 : 1) + " " + units[i];
+}
+
+/** Adds this snapshot to the history and records what changed since the last one. */
+function record(s) {
+  const prev = history[history.length - 1];
+  const leader = s.nodes.find(n => n.role === "leader");
+  const point = { t: s.t, leader: leader ? leader.id : null, marks: [], nodes: [] };
+  for (const n of s.nodes) {
+    const before = prev && prev.nodes[n.id - 1];
+    const messages = n.stats ? n.stats.messages : null;
+    let rate = null;
+    if (messages != null && before && before.messages != null && s.t > prev.t && messages >= before.messages) {
+      rate = (messages - before.messages) * 1000 / (s.t - prev.t);
+    }
+    point.nodes.push({ state: n.state, messages, rate });
+  }
+  if (prev) {
+    const note = (text, mark) => { events.unshift({ t: s.t, text }); point.marks.push(mark); };
+    for (const n of s.nodes) {
+      const was = prev.nodes[n.id - 1].state, now = n.state;
+      if (was !== "running" && now === "running") {
+        catchingUp.set(n.id, { since: s.t, replayed: 0, steady: 0, steadySince: null });
+        note(`${n.name} started`, `node ${n.id} started`);
+      }
+      if (was === "running" && now !== "running") {
+        catchingUp.delete(n.id);
+        note(n.exitCode ? `${n.name} exited with code ${n.exitCode}` : `${n.name} stopped`, `node ${n.id} stopped`);
+      }
+    }
+    if (point.leader && point.leader !== prev.leader) {
+      const name = id => s.nodes[id - 1].name;
+      note(prev.leader ? `${name(point.leader)} took over as leader from ${name(prev.leader)}` : `${name(point.leader)} is the leader`,
+        `node ${point.leader} leader`);
+    }
+    // A restarted node replays what it missed, so it writes faster than the leader until it is back in step.
+    const leaderRate = leader ? point.nodes[leader.id - 1].rate : null;
+    for (const [id, c] of catchingUp) {
+      const n = s.nodes[id - 1], rate = point.nodes[id - 1].rate;
+      if (n === leader) { catchingUp.delete(id); continue; }
+      if (rate == null || leaderRate == null) continue;
+      if (rate > leaderRate) c.replayed += (rate - leaderRate) * (s.t - prev.t) / 1000;
+      if (Math.abs(rate - leaderRate) <= leaderRate * 0.2 + 20) {
+        if (c.steady++ === 0) c.steadySince = prev.t;
+      } else c.steady = 0;
+      if (c.steady >= 3) {
+        catchingUp.delete(id);
+        const secs = fmt((c.steadySince - c.since) / 1000, 0);
+        note(c.replayed >= 100
+          ? `${n.name} caught up ${secs} s after starting, replaying about ${fmt(c.replayed)} messages it missed`
+          : `${n.name} is in step with the leader, ${secs} s after starting`, `node ${id} caught up`);
+      }
+    }
+    if (events.length > 200) events.length = 200;
+  }
+  history.push(point);
+  if (history.length > WINDOW) history.shift();
+}
+
+// ---- charts ----
+
+/** A round step giving at most five intervals up to v. */
+function niceStep(v) {
+  if (!(v > 0)) return 1;
+  const raw = v / 5, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p;
+  return 10 * p;
+}
+
+/** A line chart with event markers, direct labels and a crosshair tooltip. */
+function lineChart(el, series, unit, emptyText) {
+  const W = el.clientWidth || 480, H = 220, L = 64, R = 56, T = 14, B = 26;
+  const pts = history;
+  const values = pts.flatMap(p => series.map(s => s.get(p))).filter(v => v != null);
+  if (pts.length < 2 || !values.length) {
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}"></svg><div class="empty">${emptyText}</div>`;
+    return;
+  }
+  const top = Math.max(0, ...values);
+  const step = niceStep(top);
+  const max = Math.max(step, Math.ceil(top / step) * step);
+  const x = i => L + (W - L - R) * (i / (WINDOW - 1)) + (W - L - R) * ((WINDOW - pts.length) / (WINDOW - 1));
+  const y = v => T + (H - T - B) * (1 - v / max);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${series.map(s => s.name).join(", ")}">`;
+  for (let t = 0; t <= max + step / 2; t += step) {
+    svg += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/>`;
+    svg += `<text x="${L - 8}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="var(--text-muted)">${fmt(t, step < 1 ? 1 : 0)}</text>`;
+  }
+  // The axis always spans the last 60 seconds, so label its left edge, not the first sample.
+  svg += `<text x="${L}" y="${H - 6}" font-size="11" fill="var(--text-muted)">${timeLabel(pts[pts.length - 1].t - (WINDOW - 1) * 1000)}</text>`;
+  svg += `<text x="${W - R}" y="${H - 6}" text-anchor="end" font-size="11" fill="var(--text-muted)">${timeLabel(pts[pts.length - 1].t)}</text>`;
+  let lastLabelX = -Infinity;
+  pts.forEach((p, i) => {
+    if (!p.marks.length) return;
+    svg += `<line x1="${x(i)}" x2="${x(i)}" y1="${T}" y2="${H - B}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="2 3"/>`;
+    if (x(i) - lastLabelX > 70) {
+      svg += `<text x="${x(i) + 4}" y="${T - 2}" font-size="10" fill="var(--text-muted)">${p.marks.join(", ")}</text>`;
+      lastLabelX = x(i);
+    }
+  });
+  const ends = [];
+  for (const s of series) {
+    let d = "", pen = false;
+    pts.forEach((p, i) => {
+      const v = s.get(p);
+      if (v == null) { pen = false; return; }
+      d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+      pen = true;
+    });
+    svg += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const last = pts.length - 1, v = s.get(pts[last]);
+    if (v != null) {
+      svg += `<circle cx="${x(last)}" cy="${y(v)}" r="4" fill="${s.color}" stroke="var(--surface-1)" stroke-width="2"/>`;
+      ends.push({ x: x(last) + 8, y: y(v) + 4, text: s.short });
+    }
+  }
+  // Direct labels: push apart any two that would overlap, then pull the stack back above the axis.
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+  for (let i = ends.length - 1, limit = H - B + 4; i >= 0; i--, limit -= 13) ends[i].y = Math.min(ends[i].y, limit);
+  for (const e of ends) svg += `<text x="${e.x}" y="${e.y}" font-size="11" fill="var(--text-secondary)">${e.text}</text>`;
+  svg += `<line class="cross" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>`;
+  svg += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent"/></svg><div class="tip"></div>`;
+  el.innerHTML = svg;
+
+  const svgEl = el.querySelector("svg"), cross = el.querySelector(".cross"), tip = el.querySelector(".tip");
+  el.querySelector("rect").addEventListener("mousemove", e => {
+    const box = svgEl.getBoundingClientRect();
+    const sx = (e.clientX - box.left) * (W / box.width);
+    let best = 0, bestDist = Infinity;
+    pts.forEach((p, i) => { const dist = Math.abs(x(i) - sx); if (dist < bestDist) { bestDist = dist; best = i; } });
+    const p = pts[best];
+    cross.setAttribute("x1", x(best)); cross.setAttribute("x2", x(best)); cross.setAttribute("visibility", "visible");
+    tip.innerHTML = `<div>${timeLabel(p.t)}</div>` + series.map(s =>
+      `<div><i style="--c:${s.color}"></i>${s.name} <b>${fmt(s.get(p))}</b> ${unit}</div>`).join("")
+      + (p.marks.length ? `<div>${p.marks.join(", ")}</div>` : "");
+    tip.style.display = "block";
+    tip.style.left = Math.min(x(best) * (box.width / W) + 12, box.width - tip.offsetWidth) + "px";
+    tip.style.top = "8px";
+  });
+  el.querySelector("rect").addEventListener("mouseleave", () => { cross.setAttribute("visibility", "hidden"); tip.style.display = "none"; });
+}
+
+const nodeSeries = field => [1, 2, 3].map(id => ({
+  name: "Node " + id, short: "Node " + id, color: SERIES[id - 1], get: p => p.nodes[id - 1][field],
+}));
+
+function render() {
+  lineChart(document.getElementById("plot-messages"), nodeSeries("messages"), "msgs", "Start the cluster to see what each node holds.");
+  lineChart(document.getElementById("plot-rate"), nodeSeries("rate"), "msg/s", "Start the cluster, then a run in another tab, to see writes.");
+  document.getElementById("event-rows").innerHTML = events.length
+    ? events.map(e => `<tr><td>${timeLabel(e.t)}</td><td class="left">${esc(e.text)}</td></tr>`).join("")
+    : `<tr><td colspan="2" class="muted">Nothing yet.</td></tr>`;
+  document.getElementById("rows").innerHTML = [...history].reverse().map(p =>
+    `<tr><td>${timeLabel(p.t)}</td><td>${p.leader ? "Node " + p.leader : "–"}</td>`
+    + p.nodes.map(n => `<td>${fmt(n.messages)}</td>`).join("")
+    + p.nodes.map(n => `<td>${fmt(n.rate)}</td>`).join("") + `</tr>`).join("");
 }
 
 async function post(path, fields) {
@@ -224,6 +503,8 @@ document.getElementById("start").addEventListener("click", () => {
 document.getElementById("stop").addEventListener("click", () => post("stop", {}));
 
 new EventSource("events").onmessage = e => update(JSON.parse(e.data));
+window.addEventListener("resize", render);
+render();
 </script>
 </body>
 </html>

@@ -75,6 +75,10 @@ final class ClusterServer {
     private static final Pattern NODE_JSON = Pattern.compile(
             "\\{\"name\":\"([^\"]*)\",\"ip\":\"[^\"]*\",\"endpoints\":\\{[^}]*\\},\"role\":\"([^\"]*)\",\"status\":\"([^\"]*)\"\\}");
     private static final Pattern TOKEN_JSON = Pattern.compile("\"access_token\":\\{\"token\":\"([^\"]+)\"");
+    /** A top-level field of the stats JSON: a number, or a string such as a byte size like "5380 KiB". */
+    private static final Pattern STAT_JSON = Pattern.compile("\"([a-z_]+)\":(\"[^\"]*\"|[-0-9.eE]+)");
+
+    private static final Pattern BYTES = Pattern.compile("([0-9.]+)\\s*([KMGTP]?)(i?)B");
 
     private static Node node(int id) {
         return new Node(
@@ -101,6 +105,20 @@ final class ClusterServer {
     /** The cluster's own view, read from one node. */
     record ClusterView(String from, Map<String, String> roles, Map<String, String> statuses) {}
 
+    /** What one node reports about itself from its /stats endpoint. Followers count the messages they hold too. */
+    record NodeStats(
+            long messages,
+            long messageBytes,
+            long writtenBytes,
+            long streams,
+            long topics,
+            long partitions,
+            long segments,
+            long clients,
+            long consumerGroups,
+            double cpu,
+            long memoryBytes) {}
+
     private final String docker;
     private final String image;
     private final String password;
@@ -114,6 +132,7 @@ final class ClusterServer {
     private final Map<Integer, String> tokens = new ConcurrentHashMap<>();
     private volatile Map<Integer, ContainerState> states = Map.of();
     private volatile ClusterView view;
+    private volatile Map<Integer, NodeStats> stats = Map.of();
     private volatile String dockerProblem;
     private volatile String message = "";
     private volatile boolean messageIsError;
@@ -363,6 +382,7 @@ final class ClusterServer {
             dockerProblem = e.getMessage();
         }
         view = readView();
+        stats = readStats();
         String json = snapshot();
         byte[] event = ("data: " + json + "\n\n").getBytes(StandardCharsets.UTF_8);
         for (HttpExchange listener : listeners) {
@@ -430,9 +450,38 @@ final class ClusterServer {
                     .append(role == null || !state.running() ? "null" : DemoJson.quote(role))
                     .append(",\"status\":")
                     .append(status == null || !state.running() ? "null" : DemoJson.quote(status))
-                    .append('}');
+                    .append(",\"stats\":");
+            NodeStats s = stats.get(node.id());
+            if (s == null || !state.running()) {
+                json.append("null");
+            } else {
+                json.append("{\"messages\":")
+                        .append(s.messages())
+                        .append(",\"messageBytes\":")
+                        .append(s.messageBytes())
+                        .append(",\"writtenBytes\":")
+                        .append(s.writtenBytes())
+                        .append(",\"streams\":")
+                        .append(s.streams())
+                        .append(",\"topics\":")
+                        .append(s.topics())
+                        .append(",\"partitions\":")
+                        .append(s.partitions())
+                        .append(",\"segments\":")
+                        .append(s.segments())
+                        .append(",\"clients\":")
+                        .append(s.clients())
+                        .append(",\"consumerGroups\":")
+                        .append(s.consumerGroups())
+                        .append(",\"cpu\":")
+                        .append(String.format(Locale.ROOT, "%.1f", s.cpu()))
+                        .append(",\"memoryBytes\":")
+                        .append(s.memoryBytes())
+                        .append('}');
+            }
+            json.append('}');
         }
-        return json.append("]}").toString();
+        return json.append("],\"t\":").append(now).append('}').toString();
     }
 
     private void events(HttpExchange exchange) throws IOException {
@@ -527,7 +576,7 @@ final class ClusterServer {
             if (!state.running()) {
                 continue;
             }
-            String body = metadata(node);
+            String body = fetch(node, "/cluster/metadata");
             if (body == null) {
                 continue;
             }
@@ -545,8 +594,57 @@ final class ClusterServer {
         return null;
     }
 
-    /** The metadata JSON from one node, logging in first when its token is missing or stale. */
-    private String metadata(Node node) {
+    /** Each running node's own stats, by node id; nodes that do not answer are left out. */
+    private Map<Integer, NodeStats> readStats() {
+        Map<Integer, NodeStats> result = new HashMap<>();
+        for (Node node : NODES) {
+            if (!states.getOrDefault(node.id(), ContainerState.ABSENT).running()) {
+                continue;
+            }
+            String body = fetch(node, "/stats");
+            if (body == null) {
+                continue;
+            }
+            Map<String, String> f = new HashMap<>();
+            Matcher m = STAT_JSON.matcher(body);
+            while (m.find()) {
+                f.putIfAbsent(m.group(1), m.group(2).replace("\"", ""));
+            }
+            try {
+                result.put(
+                        node.id(),
+                        new NodeStats(
+                                Long.parseLong(f.get("messages_count")),
+                                bytes(f.get("messages_size_bytes")),
+                                bytes(f.get("written_bytes")),
+                                Long.parseLong(f.get("streams_count")),
+                                Long.parseLong(f.get("topics_count")),
+                                Long.parseLong(f.get("partitions_count")),
+                                Long.parseLong(f.get("segments_count")),
+                                Long.parseLong(f.get("clients_count")),
+                                Long.parseLong(f.get("consumer_groups_count")),
+                                Double.parseDouble(f.get("cpu_usage")),
+                                bytes(f.get("memory_usage"))));
+            } catch (RuntimeException e) {
+                // A server whose stats do not have the fields expected shows no numbers rather than failing the page.
+            }
+        }
+        return result;
+    }
+
+    /** Parses a byte size as the server writes it, such as "0 B", "5380 KiB" or "3034.926 KB". */
+    static long bytes(String text) {
+        Matcher m = BYTES.matcher(text.trim());
+        if (!m.matches()) {
+            throw new IllegalArgumentException("Not a byte size: " + text);
+        }
+        int power = m.group(2).isEmpty() ? 0 : "KMGTP".indexOf(m.group(2)) + 1;
+        double unit = Math.pow(m.group(3).isEmpty() ? 1000 : 1024, power);
+        return Math.round(Double.parseDouble(m.group(1)) * unit);
+    }
+
+    /** A JSON body from one node's HTTP API, logging in first when its token is missing or stale. */
+    private String fetch(Node node, String path) {
         String token = tokens.get(node.id());
         if (token == null) {
             token = login(node);
@@ -554,19 +652,18 @@ final class ClusterServer {
                 return null;
             }
         }
-        String body = get(node, token);
+        String body = get(node, token, path);
         if (body == null) {
             tokens.remove(node.id());
             token = login(node);
-            body = token == null ? null : get(node, token);
+            body = token == null ? null : get(node, token, path);
         }
         return body;
     }
 
-    private String get(Node node, String token) {
+    private String get(Node node, String token, String path) {
         try {
-            HttpRequest request = HttpRequest.newBuilder(
-                            URI.create("http://127.0.0.1:" + node.http() + "/cluster/metadata"))
+            HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + node.http() + path))
                     .header("Authorization", "Bearer " + token)
                     .timeout(Duration.ofMillis(700))
                     .GET()

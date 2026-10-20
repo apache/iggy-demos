@@ -209,6 +209,8 @@ A run's streams, with their topics, data and consumer groups, are deleted when t
 
 The Iggy cluster tab starts three Iggy nodes in Docker, kept consistent by Viewstamped Replication, and stops and starts each node on its own. Stop a node and the other two carry on; stop the leader and a follower takes over; start a node again and it catches up. The tab shows each container's state from Docker and the cluster's own view of the nodes, roles included, read from the first node whose HTTP API answers. Each node card also shows its last log lines.
 
+Each running node's own stats are read once a second. Two charts show the messages each node holds and the messages it writes per second, so a stopped node's line breaks and a restarted node writes faster than the leader while it replays what it missed. The cards add each node's message data, streams, topics, partitions, segments, clients, CPU and memory. An event list records nodes stopping and starting, leader changes, and how long a restarted node took to catch up. Message counts differ a little between nodes because each node's retention deletes old segments on its own schedule.
+
 Node 1 serves TCP on `localhost:18090`, the demos' default bootstrap address, so the other tabs run against the cluster once it is up. Stop any standalone Iggy server on that port first, or node 1 cannot publish it.
 
 | Node | Container | TCP | HTTP |
