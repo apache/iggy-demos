@@ -5,6 +5,7 @@ Demo applications and use cases built on [Apache Iggy](https://iggy.apache.org),
 ## Demos
 
 - [kafka-clients](kafka-clients/): Kafka's `Producer`, `Consumer` and `Admin` interfaces backed by Iggy, with a demo page that shows messages moving in real time and what happens when producers outrun a consumer, and the same workload on the Iggy Rust SDK for comparison.
+- [agent-handoff](agent-handoff/): two AI agents hand work to each other through the Iggy MCP server on Kubernetes. The worker keeps its progress as a consumer offset, survives being killed, and a read-only auditor replays the handoff.
 
 ## Adding a demo
 

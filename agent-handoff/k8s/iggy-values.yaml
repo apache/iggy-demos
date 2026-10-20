@@ -1,0 +1,48 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# Helm values for the Iggy broker, for the chart in helm/charts/iggy at the
+# server-0.9.0 tag. Only the broker is deployed; the MCP servers are in mcp.yaml.
+
+server:
+  # The release is named iggy, so this is the Service the MCP servers dial.
+  advertisedAddress: iggy
+  image:
+    tag: "0.9.0"
+    pullPolicy: IfNotPresent
+  users:
+    root:
+      username: iggy
+      password: iggy
+  env:
+    - name: RUST_LOG
+      value: info
+    - name: IGGY_HTTP_ADDRESS
+      value: "0.0.0.0:3000"
+    - name: IGGY_TCP_ADDRESS
+      value: "0.0.0.0:8090"
+    - name: IGGY_QUIC_ADDRESS
+      value: "0.0.0.0:8080"
+    - name: IGGY_WEBSOCKET_ADDRESS
+      value: "0.0.0.0:8092"
+    # The default numa:auto binds shard memory to NUMA nodes, which fails on
+    # kind under Docker Desktop.
+    - name: IGGY_SHARDING_CPU_ALLOCATION
+      value: "2"
+
+ui:
+  enabled: false

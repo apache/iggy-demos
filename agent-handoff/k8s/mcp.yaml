@@ -1,0 +1,229 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# One Iggy MCP server per agent. Each logs in to the broker with its own
+# user's personal access token, mounted from a Secret that setup.sh creates.
+#
+#   planner  create             sends plans
+#   worker   create, update     polls plans, stores its offset, sends results
+#   auditor  read only          replays both topics, reads the worker's offset
+#
+# Read is on for all three. Delete is off for all three.
+---
+# The planner agent's MCP server.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iggy-mcp-planner
+  labels:
+    app: iggy-mcp-planner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iggy-mcp-planner
+  template:
+    metadata:
+      labels:
+        app: iggy-mcp-planner
+    spec:
+      containers:
+        - name: iggy-mcp
+          image: apache/iggy-mcp:0.5.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: IGGY_MCP_TRANSPORT
+              value: http
+            - name: IGGY_MCP_HTTP_ADDRESS
+              value: "0.0.0.0:8082"
+            - name: IGGY_MCP_IGGY_ADDRESS
+              value: "iggy:8090"
+            # A non-empty token takes precedence over username and password.
+            - name: IGGY_MCP_IGGY_TOKEN
+              value: file:/run/secrets/iggy/token
+            # Consumer offsets are stored under this name.
+            - name: IGGY_MCP_IGGY_CONSUMER
+              value: planner
+            - name: IGGY_MCP_PERMISSIONS_CREATE
+              value: "true"
+            - name: IGGY_MCP_PERMISSIONS_READ
+              value: "true"
+            - name: IGGY_MCP_PERMISSIONS_UPDATE
+              value: "false"
+            - name: IGGY_MCP_PERMISSIONS_DELETE
+              value: "false"
+            - name: RUST_LOG
+              value: info
+          ports:
+            - name: mcp
+              containerPort: 8082
+          volumeMounts:
+            - name: pat
+              mountPath: /run/secrets/iggy
+              readOnly: true
+      volumes:
+        - name: pat
+          secret:
+            secretName: iggy-pat-planner
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iggy-mcp-planner
+spec:
+  selector:
+    app: iggy-mcp-planner
+  ports:
+    - name: mcp
+      port: 8082
+      targetPort: mcp
+---
+# The worker agent's MCP server.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iggy-mcp-worker
+  labels:
+    app: iggy-mcp-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iggy-mcp-worker
+  template:
+    metadata:
+      labels:
+        app: iggy-mcp-worker
+    spec:
+      containers:
+        - name: iggy-mcp
+          image: apache/iggy-mcp:0.5.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: IGGY_MCP_TRANSPORT
+              value: http
+            - name: IGGY_MCP_HTTP_ADDRESS
+              value: "0.0.0.0:8082"
+            - name: IGGY_MCP_IGGY_ADDRESS
+              value: "iggy:8090"
+            # A non-empty token takes precedence over username and password.
+            - name: IGGY_MCP_IGGY_TOKEN
+              value: file:/run/secrets/iggy/token
+            # Consumer offsets are stored under this name.
+            - name: IGGY_MCP_IGGY_CONSUMER
+              value: worker
+            - name: IGGY_MCP_PERMISSIONS_CREATE
+              value: "true"
+            - name: IGGY_MCP_PERMISSIONS_READ
+              value: "true"
+            - name: IGGY_MCP_PERMISSIONS_UPDATE
+              value: "true"
+            - name: IGGY_MCP_PERMISSIONS_DELETE
+              value: "false"
+            - name: RUST_LOG
+              value: info
+          ports:
+            - name: mcp
+              containerPort: 8082
+          volumeMounts:
+            - name: pat
+              mountPath: /run/secrets/iggy
+              readOnly: true
+      volumes:
+        - name: pat
+          secret:
+            secretName: iggy-pat-worker
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iggy-mcp-worker
+spec:
+  selector:
+    app: iggy-mcp-worker
+  ports:
+    - name: mcp
+      port: 8082
+      targetPort: mcp
+---
+# The auditor agent's MCP server.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iggy-mcp-auditor
+  labels:
+    app: iggy-mcp-auditor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iggy-mcp-auditor
+  template:
+    metadata:
+      labels:
+        app: iggy-mcp-auditor
+    spec:
+      containers:
+        - name: iggy-mcp
+          image: apache/iggy-mcp:0.5.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: IGGY_MCP_TRANSPORT
+              value: http
+            - name: IGGY_MCP_HTTP_ADDRESS
+              value: "0.0.0.0:8082"
+            - name: IGGY_MCP_IGGY_ADDRESS
+              value: "iggy:8090"
+            # A non-empty token takes precedence over username and password.
+            - name: IGGY_MCP_IGGY_TOKEN
+              value: file:/run/secrets/iggy/token
+            # Reads the worker's stored offset. With update off it cannot move it.
+            - name: IGGY_MCP_IGGY_CONSUMER
+              value: worker
+            - name: IGGY_MCP_PERMISSIONS_CREATE
+              value: "false"
+            - name: IGGY_MCP_PERMISSIONS_READ
+              value: "true"
+            - name: IGGY_MCP_PERMISSIONS_UPDATE
+              value: "false"
+            - name: IGGY_MCP_PERMISSIONS_DELETE
+              value: "false"
+            - name: RUST_LOG
+              value: info
+          ports:
+            - name: mcp
+              containerPort: 8082
+          volumeMounts:
+            - name: pat
+              mountPath: /run/secrets/iggy
+              readOnly: true
+      volumes:
+        - name: pat
+          secret:
+            secretName: iggy-pat-auditor
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iggy-mcp-auditor
+spec:
+  selector:
+    app: iggy-mcp-auditor
+  ports:
+    - name: mcp
+      port: 8082
+      targetPort: mcp
