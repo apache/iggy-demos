@@ -24,8 +24,8 @@ import org.apache.iggy.identifier.StreamId;
 import org.apache.iggy.identifier.TopicId;
 import org.apache.iggy.kafka.IggyKafkaConsumer;
 import org.apache.iggy.kafka.IggyKafkaProducer;
-import org.apache.iggy.message.HeaderValue;
 import org.apache.iggy.topic.CompressionAlgorithm;
+import org.apache.iggy.topic.TopicOptions;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.Metric;
@@ -192,7 +192,7 @@ public final class DemoServer extends DemoWeb<DemoServer.Settings, DemoServer.Ru
          * Retention only removes whole sealed segments and keeps at least one per partition, so
          * small segments let the cap take effect and keep the floor small with many topics.
          */
-        static final String SEGMENT_SIZE = "4 MiB";
+        static final long SEGMENT_SIZE_BYTES = 4L * 1024 * 1024;
 
         /** Names the run; topics are this plus -1, -2 and so on, groups this plus -s1, -s2. */
         final String name = "demo-" + System.currentTimeMillis();
@@ -864,12 +864,13 @@ public final class DemoServer extends DemoWeb<DemoServer.Settings, DemoServer.Ru
             admin.topics()
                     .createTopic(
                             stream,
-                            (long) partitions,
-                            CompressionAlgorithm.None,
-                            BigInteger.ZERO, // no message expiry
-                            BigInteger.valueOf(MAX_TOPIC_MIB * 1024 * 1024),
                             topic,
-                            Map.of("segment_size", HeaderValue.fromString(SEGMENT_SIZE)));
+                            (long) partitions,
+                            TopicOptions.builder()
+                                    .compressionAlgorithm(CompressionAlgorithm.None)
+                                    .maxTopicSize(BigInteger.valueOf(MAX_TOPIC_MIB * 1024 * 1024))
+                                    .segmentSize(BigInteger.valueOf(SEGMENT_SIZE_BYTES))
+                                    .build());
         }
 
         private void deleteTopic(IggyTcpClient admin, String topic) {

@@ -84,7 +84,7 @@ class IggyAdminClientTest {
 
     @BeforeAll
     static void startIggy() {
-        iggy = new GenericContainer<>(System.getProperty("iggy.image", "apache/iggy:0.9.0"))
+        iggy = new GenericContainer<>(System.getProperty("iggy.image", "apache/iggy:0.10.0"))
                 .withEnv("IGGY_ROOT_USERNAME", "iggy")
                 .withEnv("IGGY_ROOT_PASSWORD", "iggy")
                 .withEnv("IGGY_TCP_ADDRESS", "0.0.0.0:8090")
@@ -282,10 +282,6 @@ class IggyAdminClientTest {
                 assertFails(
                         GroupNotEmptyException.class,
                         admin.deleteConsumerGroups(List.of(group)).all());
-                assertFails(
-                        GroupNotEmptyException.class,
-                        admin.alterConsumerGroupOffsets(group, Map.of(tp, new OffsetAndMetadata(2)))
-                                .all());
             }
 
             assertEquals(
@@ -294,22 +290,9 @@ class IggyAdminClientTest {
                             .get(group)
                             .state());
 
-            get(admin.alterConsumerGroupOffsets(group, Map.of(tp, new OffsetAndMetadata(2)))
-                    .all());
-            assertEquals(
-                    2,
-                    get(admin.listConsumerGroupOffsets(group).partitionsToOffsetAndMetadata())
-                            .get(tp)
-                            .offset());
-            assertEquals(
-                    ConsumerGroupState.EMPTY,
-                    get(admin.describeConsumerGroups(List.of(group)).all())
-                            .get(group)
-                            .state());
-
             try (Consumer<String, String> consumer = new IggyKafkaConsumer<>(consumerProps(group, 1))) {
                 consumer.subscribe(List.of(topic));
-                assertEquals(2, pollUntil(consumer, 1).get(0).offset());
+                assertEquals(4, pollUntil(consumer, 1).get(0).offset(), "resumes from the committed offset");
             }
 
             get(admin.deleteConsumerGroups(List.of(group)).all());
@@ -332,6 +315,10 @@ class IggyAdminClientTest {
             assertThrows(UnsupportedOperationException.class, () -> admin.describeAcls(AclBindingFilter.ANY));
             assertThrows(UnsupportedOperationException.class, () -> admin.deleteRecords(Map.of()));
             assertThrows(UnsupportedOperationException.class, () -> admin.listTransactions());
+            assertThrows(
+                    UnsupportedOperationException.class,
+                    () -> admin.alterConsumerGroupOffsets(
+                            name("g"), Map.of(new TopicPartition(name("t"), 0), new OffsetAndMetadata(1))));
         }
     }
 
@@ -380,8 +367,11 @@ class IggyAdminClientTest {
                 producer.send(new ProducerRecord<>(topic, 0, "k", "v1")).get(10, TimeUnit.SECONDS);
                 producer.send(new ProducerRecord<>(topic, 0, "k", "v2")).get(10, TimeUnit.SECONDS);
             }
-            get(admin.alterConsumerGroupOffsets(group, Map.of(committed, new OffsetAndMetadata(1)))
-                    .all());
+            try (Consumer<String, String> consumer = new IggyKafkaConsumer<>(consumerProps(group, 2))) {
+                consumer.subscribe(List.of(topic));
+                pollUntil(consumer, 2);
+                consumer.commitSync(Map.of(committed, new OffsetAndMetadata(1)));
+            }
             assertEquals(
                     Map.of(committed, new OffsetAndMetadata(1)),
                     get(admin.listConsumerGroupOffsets(group).partitionsToOffsetAndMetadata()));

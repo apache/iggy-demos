@@ -32,6 +32,7 @@ import org.apache.iggy.message.Partitioning;
 import org.apache.iggy.message.PolledMessages;
 import org.apache.iggy.message.PollingStrategy;
 import org.apache.iggy.topic.CompressionAlgorithm;
+import org.apache.iggy.topic.TopicOptions;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
@@ -104,7 +105,12 @@ class LatencyProbeTest {
         String topic = "lat" + topicNumber++;
         c.topics()
                 .createTopic(
-                        stream, (long) PARTITIONS, CompressionAlgorithm.None, BigInteger.ZERO, BigInteger.ZERO, topic);
+                        stream,
+                        topic,
+                        (long) PARTITIONS,
+                        TopicOptions.builder()
+                                .compressionAlgorithm(CompressionAlgorithm.None)
+                                .build());
         return topic;
     }
 
@@ -265,7 +271,7 @@ class LatencyProbeTest {
 
     @Test
     void probe() throws Exception {
-        try (var iggy = new GenericContainer<>("apache/iggy:0.9.0")
+        try (var iggy = new GenericContainer<>("apache/iggy:0.10.0")
                 .withEnv("IGGY_ROOT_USERNAME", "iggy")
                 .withEnv("IGGY_ROOT_PASSWORD", "iggy")
                 .withEnv("IGGY_TCP_ADDRESS", "0.0.0.0:8090")

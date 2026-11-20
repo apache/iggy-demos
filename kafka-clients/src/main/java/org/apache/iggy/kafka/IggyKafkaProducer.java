@@ -19,6 +19,8 @@
 
 package org.apache.iggy.kafka;
 
+import org.apache.iggy.exception.IggyErrorCode;
+import org.apache.iggy.exception.IggyOperationException;
 import org.apache.iggy.identifier.TopicId;
 import org.apache.iggy.kafka.RecordCodec.KafkaRecord;
 import org.apache.iggy.kafka.RecordCodec.Window;
@@ -358,6 +360,7 @@ public class IggyKafkaProducer<K, V> implements Producer<K, V> {
                                 tp.topic(), confirmation.partitionId().intValue());
                     }
                 } catch (Exception e) {
+                    abandonLostSend(e);
                     error = e;
                 }
             }
@@ -384,6 +387,24 @@ public class IggyKafkaProducer<K, V> implements Producer<K, V> {
                 (error == null ? sendSensor : errorSensor).record(messages.size());
             }
             release(group.size(), bytes);
+        }
+    }
+
+    /**
+     * The SDK keeps a send whose reply was lost and refuses later sends to its partition until the send is
+     * abandoned. Abandoning accepts that it may or may not have been stored, which the callback reports.
+     */
+    private void abandonLostSend(Exception e) {
+        if (e.getCause() instanceof IggyOperationException lost
+                && lost.getErrorCode() == IggyErrorCode.OPERATION_UNCERTAIN) {
+            try {
+                connection.call(c -> {
+                    c.abandonOperation(lost.getOperationId());
+                    return null;
+                });
+            } catch (KafkaException abandonFailed) {
+                e.addSuppressed(abandonFailed);
+            }
         }
     }
 

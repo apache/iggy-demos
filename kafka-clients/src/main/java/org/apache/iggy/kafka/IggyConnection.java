@@ -32,6 +32,7 @@ import org.apache.iggy.message.PollingStrategy;
 import org.apache.iggy.topic.CompressionAlgorithm;
 import org.apache.iggy.topic.Topic;
 import org.apache.iggy.topic.TopicDetails;
+import org.apache.iggy.topic.TopicOptions;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.PartitionInfo;
@@ -39,7 +40,6 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 
-import java.math.BigInteger;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -199,11 +199,11 @@ final class IggyConnection implements AutoCloseable {
             return client.topics()
                     .createTopic(
                             streamId,
+                            topic,
                             config.defaultPartitions(),
-                            CompressionAlgorithm.None,
-                            BigInteger.ZERO,
-                            BigInteger.ZERO,
-                            topic);
+                            TopicOptions.builder()
+                                    .compressionAlgorithm(CompressionAlgorithm.None)
+                                    .build());
         } catch (RuntimeException e) {
             return client.topics()
                     .getTopic(streamId, topicId)
