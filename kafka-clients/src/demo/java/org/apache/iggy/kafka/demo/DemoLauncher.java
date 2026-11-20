@@ -38,7 +38,7 @@ import java.util.concurrent.Executors;
  * <p>Run with {@code mvn -Pdemo compile exec:java}, then open http://localhost:8080. Settings:
  * {@code -Ddemo.bootstrap} (default localhost:18090), {@code -Ddemo.port} (default 8080),
  * {@code -Ddemo.rustUrl} (default http://localhost:8081/), {@code -Ddemo.docker} (default docker),
- * {@code -Ddemo.iggyImage} (default apache/iggy:0.9.0), and the Iggy password in
+ * {@code -Ddemo.iggyImage} (default apache/iggy:0.10.0), and the Iggy password in
  * {@code IGGY_PASSWORD} (default iggy).
  */
 public final class DemoLauncher {
@@ -55,7 +55,7 @@ public final class DemoLauncher {
         IggySdkDemoServer java = new IggySdkDemoServer(bootstrap, password);
         ClusterServer cluster = new ClusterServer(
                 System.getProperty("demo.docker", "docker"),
-                System.getProperty("demo.iggyImage", "apache/iggy:0.9.0"),
+                System.getProperty("demo.iggyImage", "apache/iggy:0.10.0"),
                 password);
         HttpServer server = server(port);
         kafka.mount(server, "/kafka");
