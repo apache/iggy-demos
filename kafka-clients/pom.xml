@@ -207,6 +207,12 @@ under the License.
 
   <build>
     <plugins>
+      <!-- Maven 3.8 defaults to compiler plugin 3.1, which ignores maven.compiler.release -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
