@@ -54,9 +54,9 @@ jobs:
         working-directory: kafka-clients/rust-demo
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      # Installs the toolchain pinned in rust-toolchain.toml, as apache/iggy does.
+      - name: Setup Rust toolchain
+        run: rustup show
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: kafka-clients/rust-demo
