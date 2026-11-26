@@ -8,7 +8,7 @@ Consumer<String, String> consumer = new IggyKafkaConsumer<>(props);   // was new
 Admin admin = IggyAdminClient.create(props);                          // was AdminClient.create(props)
 ```
 
-Built with Java 17 against `kafka-clients` 4.3.0 and the Iggy Java SDK 0.9.0, for an Iggy 0.9.x server. The jar also runs with `kafka-clients` 3.9 on the classpath, and keeps the 3.x methods that 4.0 removed: `poll(long)`, `committed(TopicPartition)` and `alterConfigs`. Older 3.x versions have not been tried.
+Built with Java 17 against `kafka-clients` 4.3.0 and the Iggy Java SDK 0.10.0, for an Iggy 0.10.x server. The jar also runs with `kafka-clients` 3.9 on the classpath, and keeps the 3.x methods that 4.0 removed: `poll(long)`, `committed(TopicPartition)` and `alterConfigs`. Older 3.x versions have not been tried.
 
 The jar is not in any Maven repository. Build it with `mvn package` (see Building and testing below).
 
@@ -63,13 +63,13 @@ What maps onto Iggy:
 - Topics: `createTopics`, `deleteTopics`, `listTopics`, `describeTopics` (by name or id) and `createPartitions`. A topic's id is the stream's numeric id over the topic's. `createTopics` honours `retention.ms` (Iggy message expiry), `retention.bytes` (Iggy's topic size cap) and `compression.type` (`none` or `gzip`). Other topic configs and the replication factor are ignored.
 - `describeConfigs` on a topic returns `retention.ms`, `retention.bytes` and `compression.type`. Other resource types fail with `InvalidRequestException`.
 - `describeCluster` lists the cluster's nodes, leader first. A single node is reported at the bootstrap address.
-- Consumer groups: `listConsumerGroups`, `listGroups`, `describeConsumerGroups`, `deleteConsumerGroups`, `listConsumerGroupOffsets` and `alterConsumerGroupOffsets`. Iggy groups are per topic, so a Kafka group is every Iggy group of that name across the stream. Member ids are Iggy client ids. As in Kafka, a group with active members can neither be deleted nor have its offsets changed.
+- Consumer groups: `listConsumerGroups`, `listGroups`, `describeConsumerGroups`, `deleteConsumerGroups`, and `listConsumerGroupOffsets`. Iggy groups are per topic, so a Kafka group is every Iggy group of that name across the stream. Member ids are Iggy client ids. As in Kafka, a group with active members cannot be deleted.
 - `listOffsets` for earliest, latest and a timestamp. The timestamp search uses Iggy's append time, as `offsetsForTimes()` does.
 
 Limits:
 
 - Calls run on the caller's thread and return completed futures. The `timeoutMs` in each options object is ignored; `request.timeout.ms` bounds each Iggy request.
-- Iggy only takes group offsets from a member, so `alterConsumerGroupOffsets` joins the empty group on each topic, stores the offsets and leaves. Offset 0 cannot be stored, because Iggy has no encoding for "nothing consumed"; delete the group to start over.
+- `alterConsumerGroupOffsets` throws `UnsupportedOperationException`, because Iggy 0.10.0 only stores a group offset from the member that owns the partition.
 - Offsets committed through `assign()`, which the consumer stores under a standalone consumer, are not visible to the admin client.
 - ACLs, quotas, SCRAM credentials, delegation tokens, log directories, reassignments, leader elections, the Raft quorum, transactions, share groups, streams groups, config changes, record deletion, deleting single offsets and removing members throw `UnsupportedOperationException`.
 
@@ -94,7 +94,7 @@ Nothing is exported over JMX.
 - Offsets are not yet stored the way the gateway stores them, so a consumer group cannot move between this library and the gateway.
 - `assign()` with a `group.id` stores offsets under a standalone Iggy consumer named after the group, because Iggy only accepts group offsets from the member that owns the partition. These offsets are separate from the ones written through `subscribe()`. Iggy hashes standalone consumer names to 32 bits, so two group names can collide.
 - Committing offset 0 does nothing, because Iggy cannot store "nothing consumed".
-- A consumer can commit offsets for a group it has not joined only while that group has no members, as in Kafka. It joins the group for the commit and leaves again; otherwise `commitSync` throws `CommitFailedException`.
+- A consumer cannot commit offsets for a group it has not joined, as Kafka allows for an empty group. `commitSync` throws `UnsupportedOperationException`, because Iggy 0.10.0 only stores a group offset from the member that owns the partition.
 - `commitAsync` commits on the calling thread and runs its callback before it returns.
 - `offsetsForTimes()` searches by Iggy append time, not by record timestamp.
 - Iggy has no long poll. With nothing buffered, `poll()` sends one request per assigned partition, then waits `iggy.poll.idle.ms` (20 ms by default) if nothing came back. An idle consumer on many partitions keeps sending requests, and after a quiet spell a record can take up to that wait to arrive.
@@ -217,7 +217,7 @@ Node 1 serves TCP on `localhost:18090`, the demos' default bootstrap address, so
 | iggy-node-2 | iggy-demo-node-2 | 18091 | 13001 |
 | iggy-node-3 | iggy-demo-node-3 | 18092 | 13002 |
 
-The containers run `apache/iggy:0.9.0` (`-Ddemo.iggyImage`) on a Docker network of their own, `iggy-demo-cluster`, with the Docker command found on the path (`-Ddemo.docker`). The first start pulls the image. `IGGY_PASSWORD` is the root password on the cluster's first boot. Stopping the cluster, or quitting the demos, stops the containers and keeps their data for the next start; tick Start from empty data to remove them first.
+The containers run `apache/iggy:0.10.0` (`-Ddemo.iggyImage`) on a Docker network of their own, `iggy-demo-cluster`, with the Docker command found on the path (`-Ddemo.docker`). The first start pulls the image. `IGGY_PASSWORD` is the root password on the cluster's first boot. Stopping the cluster, or quitting the demos, stops the containers and keeps their data for the next start; tick Start from empty data to remove them first.
 
 Two settings go beyond the Deploy a Cluster page: the containers run with `--security-opt seccomp=unconfined`, as the repository's compose files do, because Docker's default profile blocks io_uring, and `IGGY_SHARDING_CPU_ALLOCATION=2` replaces the default NUMA allocation, which fails in Docker Desktop's VM (apache/iggy#4242).
 
@@ -241,7 +241,7 @@ Rust has no garbage collector, so the GC column and markers stay empty.
 mvn test
 ```
 
-The tests start `apache/iggy:0.9.0` with Testcontainers, so Docker must be running. `mvn package` runs them and builds the jar into `target`.
+The tests start `apache/iggy:0.10.0` with Testcontainers, so Docker must be running. `mvn package` runs them and builds the jar into `target`.
 
 To run the tests with `kafka-clients` 3.9 in place of 4.3:
 

@@ -63,7 +63,7 @@ class ReliabilityTest {
 
     @BeforeAll
     static void startIggy() {
-        iggy = new GenericContainer<>(System.getProperty("iggy.image", "apache/iggy:0.9.0"))
+        iggy = new GenericContainer<>(System.getProperty("iggy.image", "apache/iggy:0.10.0"))
                 .withEnv("IGGY_ROOT_USERNAME", "iggy")
                 .withEnv("IGGY_ROOT_PASSWORD", "iggy")
                 .withEnv("IGGY_TCP_ADDRESS", "0.0.0.0:8090")

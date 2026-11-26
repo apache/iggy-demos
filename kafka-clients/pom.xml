@@ -32,7 +32,7 @@ under the License.
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <kafka.version>4.3.0</kafka.version>
-    <iggy.version>0.9.0</iggy.version>
+    <iggy.version>0.10.0</iggy.version>
     <!-- The demo to run: DemoServer (this library's Kafka clients) or IggySdkDemoServer (the Iggy SDK directly) -->
     <demo.main>org.apache.iggy.kafka.demo.DemoLauncher</demo.main>
     <!-- The benchmark needs Docker images for Iggy and Kafka and takes minutes; see the benchmark profile. -->
@@ -207,6 +207,12 @@ under the License.
 
   <build>
     <plugins>
+      <!-- Maven 3.8 defaults to compiler plugin 3.1, which ignores maven.compiler.release -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>

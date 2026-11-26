@@ -209,7 +209,7 @@ class PerfBenchmarkTest {
 
     @Test
     void iggy() throws Exception {
-        try (var iggy = new GenericContainer<>("apache/iggy:0.9.0")
+        try (var iggy = new GenericContainer<>("apache/iggy:0.10.0")
                 .withEnv("IGGY_ROOT_USERNAME", "iggy")
                 .withEnv("IGGY_ROOT_PASSWORD", "iggy")
                 .withEnv("IGGY_TCP_ADDRESS", "0.0.0.0:8090")

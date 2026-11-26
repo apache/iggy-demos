@@ -26,7 +26,6 @@ import org.apache.iggy.exception.IggyServerException;
 import org.apache.iggy.identifier.ConsumerId;
 import org.apache.iggy.identifier.StreamId;
 import org.apache.iggy.identifier.TopicId;
-import org.apache.iggy.message.HeaderValue;
 import org.apache.iggy.message.Message;
 import org.apache.iggy.message.MessageHeader;
 import org.apache.iggy.message.MessageId;
@@ -36,6 +35,7 @@ import org.apache.iggy.message.PollingStrategy;
 import org.apache.iggy.message.SendConfirmation;
 import org.apache.iggy.message.SendMessagesResponse;
 import org.apache.iggy.topic.CompressionAlgorithm;
+import org.apache.iggy.topic.TopicOptions;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -207,7 +207,7 @@ public final class IggySdkDemoServer extends DemoWeb<IggySdkDemoServer.Settings,
          * Retention only removes whole sealed segments and keeps at least one per partition, so
          * small segments let the cap take effect and keep the floor small with many topics.
          */
-        static final String SEGMENT_SIZE = "4 MiB";
+        static final long SEGMENT_SIZE_BYTES = 4L * 1024 * 1024;
 
         /**
          * Names the run. Its streams are this plus -1, -2 and so on, each holding topics t1, t2 and
@@ -1125,12 +1125,13 @@ public final class IggySdkDemoServer extends DemoWeb<IggySdkDemoServer.Settings,
             admin.topics()
                     .createTopic(
                             streamOf(topic),
-                            (long) partitions,
-                            CompressionAlgorithm.None,
-                            BigInteger.ZERO, // no message expiry
-                            BigInteger.valueOf(MAX_TOPIC_MIB * 1024 * 1024),
                             "t" + topicNumber(topic),
-                            Map.of("segment_size", HeaderValue.fromString(SEGMENT_SIZE)));
+                            (long) partitions,
+                            TopicOptions.builder()
+                                    .compressionAlgorithm(CompressionAlgorithm.None)
+                                    .maxTopicSize(BigInteger.valueOf(MAX_TOPIC_MIB * 1024 * 1024))
+                                    .segmentSize(BigInteger.valueOf(SEGMENT_SIZE_BYTES))
+                                    .build());
         }
 
         private void deleteTopic(IggyTcpClient admin, String topic) {

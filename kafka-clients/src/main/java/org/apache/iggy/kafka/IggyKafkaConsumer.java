@@ -29,7 +29,6 @@ import org.apache.iggy.message.PolledMessages;
 import org.apache.iggy.message.PollingStrategy;
 import org.apache.iggy.topic.Topic;
 import org.apache.kafka.clients.consumer.CloseOptions;
-import org.apache.kafka.clients.consumer.CommitFailedException;
 import org.apache.kafka.clients.consumer.ConsumerGroupMetadata;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -788,67 +787,39 @@ public class IggyKafkaConsumer<K, V> implements org.apache.kafka.clients.consume
             return;
         }
         requireGroup();
-        // Kafka lets a consumer commit for a group it has not joined while that group has no
-        // members. Iggy only takes group offsets from a member, so join for the duration of the
-        // commit and leave again.
-        Set<String> borrowed = new HashSet<>();
-        try {
-            for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
-                TopicPartition tp = entry.getKey();
-                long next = entry.getValue().offset();
-                if (next <= 0) {
-                    continue; // Iggy stores the last consumed offset; "nothing consumed" has no encoding.
-                }
-                if (!manualAssignment && !joinedTopics.contains(tp.topic()) && borrowed.add(tp.topic())) {
-                    joinEmptyGroup(tp.topic());
-                }
-                Consumer owner = offsetOwner();
-                connection.call(c -> {
-                    c.consumerOffsets()
-                            .storeConsumerOffset(
-                                    connection.streamId(),
-                                    TopicId.of(tp.topic()),
-                                    Optional.of((long) tp.partition()),
-                                    owner,
-                                    BigInteger.valueOf(next - 1));
-                    return null;
-                });
-                PartitionState state = assignment.get(tp);
-                if (state != null) {
-                    state.committed = next;
+        // Kafka lets a consumer commit for a group it has not joined while that group has no members.
+        // Iggy 0.10.0 only stores a group offset from the member that owns the partition.
+        if (!manualAssignment) {
+            for (TopicPartition tp : offsets.keySet()) {
+                if (!joinedTopics.contains(tp.topic())) {
+                    throw IggyKafkaConfig.unsupported("Committing offsets for a group this consumer has not joined");
                 }
             }
-        } finally {
-            for (String topic : borrowed) {
-                try {
-                    connection.call(c -> {
-                        c.consumerGroups()
-                                .leaveConsumerGroup(connection.streamId(), TopicId.of(topic), ConsumerId.of(groupId));
-                        return null;
-                    });
-                } catch (KafkaException e) {
-                    // Best effort; the server drops the member when the connection closes.
-                }
+        }
+        for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
+            TopicPartition tp = entry.getKey();
+            long next = entry.getValue().offset();
+            if (next <= 0) {
+                continue; // Iggy stores the last consumed offset; "nothing consumed" has no encoding.
+            }
+            Consumer owner = offsetOwner();
+            connection.call(c -> {
+                c.consumerOffsets()
+                        .storeConsumerOffset(
+                                connection.streamId(),
+                                TopicId.of(tp.topic()),
+                                Optional.of((long) tp.partition()),
+                                owner,
+                                BigInteger.valueOf(next - 1));
+                return null;
+            });
+            PartitionState state = assignment.get(tp);
+            if (state != null) {
+                state.committed = next;
             }
         }
         commitSensor.record(1);
         nextAutoCommit = System.currentTimeMillis() + autoCommitIntervalMs;
-    }
-
-    /** Joins the group on a topic this consumer is not subscribed to, refusing if it has members, as Kafka does. */
-    private void joinEmptyGroup(String topic) {
-        connection.describe(topic, false);
-        connection.ensureGroup(topic, groupId);
-        TopicId topicId = TopicId.of(topic);
-        connection.call(c -> {
-            var group = c.consumerGroups().getConsumerGroup(connection.streamId(), topicId, ConsumerId.of(groupId));
-            if (group.isPresent() && group.get().membersCount() > 0) {
-                throw new CommitFailedException("Group " + groupId + " has active members on " + topic
-                        + "; only a member can commit offsets for it");
-            }
-            c.consumerGroups().joinConsumerGroup(connection.streamId(), topicId, ConsumerId.of(groupId));
-            return null;
-        });
     }
 
     /** As in Kafka, a failed automatic commit does not fail poll; the next one retries. */

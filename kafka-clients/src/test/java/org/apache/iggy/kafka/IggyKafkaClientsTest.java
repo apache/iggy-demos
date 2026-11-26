@@ -75,7 +75,7 @@ class IggyKafkaClientsTest {
 
     @BeforeAll
     static void startIggy() {
-        iggy = new GenericContainer<>(System.getProperty("iggy.image", "apache/iggy:0.9.0"))
+        iggy = new GenericContainer<>(System.getProperty("iggy.image", "apache/iggy:0.10.0"))
                 .withEnv("IGGY_ROOT_USERNAME", "iggy")
                 .withEnv("IGGY_ROOT_PASSWORD", "iggy")
                 .withEnv("IGGY_TCP_ADDRESS", "0.0.0.0:8090")
@@ -172,25 +172,16 @@ class IggyKafkaClientsTest {
     }
 
     @Test
-    void commitsForAnEmptyGroupWithoutJoining() throws Exception {
+    void refusesToCommitForAGroupItHasNotJoined() throws Exception {
         String topic = topic();
         String group = "outsider-" + topic;
         produce(topic, 1, 10);
         TopicPartition tp = new TopicPartition(topic, 0);
         try (IggyKafkaConsumer<String, String> outsider = new IggyKafkaConsumer<>(consumerProps(group))) {
-            outsider.commitSync(Map.of(tp, new OffsetAndMetadata(4)));
-            assertEquals(4, outsider.committed(Set.of(tp)).get(tp).offset());
-        }
-        try (IggyKafkaConsumer<String, String> member = new IggyKafkaConsumer<>(consumerProps(group));
-                IggyKafkaConsumer<String, String> outsider = new IggyKafkaConsumer<>(consumerProps(group))) {
-            member.subscribe(List.of(topic));
-            assertEquals(
-                    4,
-                    member.poll(Duration.ofSeconds(5)).iterator().next().offset(),
-                    "resumes from the outsider's commit");
             assertThrows(
-                    org.apache.kafka.clients.consumer.CommitFailedException.class,
-                    () -> outsider.commitSync(Map.of(tp, new OffsetAndMetadata(2))));
+                    UnsupportedOperationException.class,
+                    () -> outsider.commitSync(Map.of(tp, new OffsetAndMetadata(4))));
+            assertNull(outsider.committed(Set.of(tp)).get(tp), "nothing was stored");
         }
     }
 

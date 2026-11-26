@@ -37,6 +37,7 @@ import org.apache.iggy.system.ClientInfo;
 import org.apache.iggy.topic.CompressionAlgorithm;
 import org.apache.iggy.topic.Topic;
 import org.apache.iggy.topic.TopicDetails;
+import org.apache.iggy.topic.TopicOptions;
 import org.apache.kafka.clients.admin.AbortTransactionOptions;
 import org.apache.kafka.clients.admin.AbortTransactionResult;
 import org.apache.kafka.clients.admin.AbortTransactionSpec;
@@ -213,7 +214,6 @@ import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.internals.KafkaFutureImpl;
 import org.apache.kafka.common.metrics.KafkaMetric;
 import org.apache.kafka.common.metrics.Sensor;
-import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.quota.ClientQuotaAlteration;
 import org.apache.kafka.common.quota.ClientQuotaFilter;
 
@@ -410,8 +410,16 @@ public class IggyAdminClient extends AdminClient {
         if (validateOnly) {
             return new TopicMetadataAndConfig(Uuid.ZERO_UUID, (int) partitions, 1, new Config(List.of()));
         }
-        TopicDetails created = connection.call(c ->
-                c.topics().createTopic(connection.streamId(), partitions, compression, expiry, maxSize, topic.name()));
+        TopicDetails created = connection.call(c -> c.topics()
+                .createTopic(
+                        connection.streamId(),
+                        topic.name(),
+                        partitions,
+                        TopicOptions.builder()
+                                .compressionAlgorithm(compression)
+                                .messageExpiry(expiry)
+                                .maxTopicSize(maxSize)
+                                .build()));
         connection.invalidate(topic.name());
         return new TopicMetadataAndConfig(
                 topicUuid(connection.streamNumericId(), created.id()),
@@ -520,7 +528,13 @@ public class IggyAdminClient extends AdminClient {
         return IggyAdminResults.describeConfigs(futures);
     }
 
-    private static Config configOf(BigInteger expiryMicros, BigInteger maxSizeBytes, CompressionAlgorithm compression) {
+    private static Config configOf(
+            Optional<BigInteger> expiry,
+            Optional<BigInteger> maxSize,
+            Optional<CompressionAlgorithm> compressionOption) {
+        BigInteger expiryMicros = expiry.orElse(BigInteger.ZERO);
+        BigInteger maxSizeBytes = maxSize.orElse(BigInteger.ZERO);
+        CompressionAlgorithm compression = compressionOption.orElse(CompressionAlgorithm.None);
         boolean neverExpires = expiryMicros.signum() == 0 || expiryMicros.equals(U64_MAX);
         boolean unlimited = maxSizeBytes.signum() == 0 || maxSizeBytes.equals(U64_MAX);
         return new Config(List.of(
@@ -710,78 +724,11 @@ public class IggyAdminClient extends AdminClient {
         return IggyAdminResults.listConsumerGroupOffsets(futures);
     }
 
-    /**
-     * Iggy only takes group offsets from the member that owns the partition, so this joins the empty
-     * group on each topic, stores the offsets, and leaves again. As in Kafka, the group must have no
-     * active members.
-     */
+    /** Iggy 0.10.0 only stores a group offset from the member that owns the partition. */
     @Override
     public AlterConsumerGroupOffsetsResult alterConsumerGroupOffsets(
             String groupId, Map<TopicPartition, OffsetAndMetadata> offsets, AlterConsumerGroupOffsetsOptions options) {
-        return IggyAdminResults.alterConsumerGroupOffsets(future(() -> {
-            Map<String, List<TopicPartition>> byTopic = new LinkedHashMap<>();
-            for (TopicPartition tp : offsets.keySet()) {
-                byTopic.computeIfAbsent(tp.topic(), t -> new ArrayList<>()).add(tp);
-            }
-            List<ConsumerGroupDetails> existing = new ArrayList<>();
-            for (String topic : byTopic.keySet()) {
-                connection.describe(topic, false);
-                connection
-                        .call(c -> c.consumerGroups()
-                                .getConsumerGroup(connection.streamId(), TopicId.of(topic), ConsumerId.of(groupId)))
-                        .ifPresent(existing::add);
-            }
-            requireNoMembers(groupId, existing);
-            Map<TopicPartition, Errors> results = new HashMap<>();
-            byTopic.forEach((topic, partitions) -> {
-                TopicId topicId = TopicId.of(topic);
-                ConsumerId consumerId = ConsumerId.of(groupId);
-                connection.ensureGroup(topic, groupId);
-                connection.call(c -> {
-                    c.consumerGroups().joinConsumerGroup(connection.streamId(), topicId, consumerId);
-                    return null;
-                });
-                try {
-                    for (TopicPartition tp : partitions) {
-                        long next = offsets.get(tp).offset();
-                        if (next <= 0) {
-                            // Iggy stores the last consumed offset, so "nothing consumed" cannot be written.
-                            results.put(
-                                    tp,
-                                    Errors.forException(new InvalidRequestException("Iggy cannot store offset 0 for "
-                                            + tp + "; delete the group to start over")));
-                            continue;
-                        }
-                        try {
-                            connection.call(c -> {
-                                c.consumerOffsets()
-                                        .storeConsumerOffset(
-                                                connection.streamId(),
-                                                topicId,
-                                                Optional.of((long) tp.partition()),
-                                                Consumer.group(consumerId),
-                                                BigInteger.valueOf(next - 1));
-                                return null;
-                            });
-                            results.put(tp, Errors.NONE);
-                        } catch (KafkaException e) {
-                            results.put(tp, Errors.forException(e));
-                        }
-                    }
-                } finally {
-                    try {
-                        connection.call(c -> {
-                            c.consumerGroups().leaveConsumerGroup(connection.streamId(), topicId, consumerId);
-                            return null;
-                        });
-                    } catch (KafkaException e) {
-                        // Best effort, and it must not hide a failed store; the server drops the
-                        // member when the connection closes.
-                    }
-                }
-            });
-            return results;
-        }));
+        throw IggyKafkaConfig.unsupported("Changing a consumer group's offsets");
     }
 
     // ---- log offsets ----
